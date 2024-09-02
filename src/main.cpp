@@ -8,8 +8,6 @@
 const unsigned int SCR_WIDTH=800;
 const unsigned int SCR_HEIGHT=600;
 glm::vec3 camPos = glm::vec3(0.0f, 0.0f, 3.0f);
-glm::vec3 camFront = glm::vec3(0.0f, 0.0f, -1.0f);
-glm::vec3 camUp = glm::vec3(0.0f, 1.0f, 0.0f);
 float yaw = -90.0f;
 float pitch = 0.0f;
 float lastX = SCR_WIDTH / 2.0;
@@ -146,7 +144,6 @@ int main()
         -0.5f,  0.5f,  0.5f,  0.0f, 0.0f,
         -0.5f,  0.5f, -0.5f,  0.0f, 1.0f
     };
-    // world space positions of our cubes
     glm::vec3 cubePositions[] = {
         glm::vec3( 0.0f,  0.0f,  0.0f),
         glm::vec3( 2.0f,  5.0f, -15.0f),
@@ -188,14 +185,13 @@ int main()
         glm::mat4 projection = glm::perspective(glm::radians(fov), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
         glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "projection"), 1, GL_FALSE, &projection[0][0]);
 
-        glm::mat4 view = glm::lookAt(camPos, camPos+camFront, camUp);
+        glm::mat4 view = glm::lookAt(camPos, glm::vec3(0.0,0.0,0.0), glm::vec3(0.0,1.0,0.0));
         glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "view"), 1, GL_FALSE, &view[0][0]);
 
         glBindVertexArray(VAO);
         for (unsigned int i = 0; i < 10; i++)
         {
-            // calculate the model matrix for each object and pass it to shader before drawing
-            glm::mat4 model = glm::mat4(1.0f); // make sure to initialize matrix to identity matrix first
+            glm::mat4 model = glm::mat4(1.0f);
             model = glm::translate(model, cubePositions[i]);
             float angle = 20.0f * i;
             model = glm::rotate(model, glm::radians(angle), glm::vec3(1.0f, 0.3f, 0.5f));
@@ -240,18 +236,18 @@ void mouseCallback(GLFWwindow* window, double xposIn, double yposIn){
     float yOffset = lastY - ypos;
     lastX = xpos;
     lastY = ypos;
-    float sensitivity = 0.4f; // change this value to your liking
+    float sensitivity = 0.007f;
     xOffset *= sensitivity;
     yOffset *= sensitivity;
     yaw += xOffset;
     pitch += yOffset;
-    if (pitch > 89.0f)
-        pitch = 89.0f;
-    if (pitch < -89.0f)
-        pitch = -89.0f;
-    glm::vec3 front;
-    front.x = cos(glm::radians(yaw)) * cos(glm::radians(pitch));
-    front.y = sin(glm::radians(pitch));
-    front.z = sin(glm::radians(yaw)) * cos(glm::radians(pitch));
-    camFront = glm::normalize(front);
+    if(pitch > 1.57)
+        pitch =  1.57f;
+    if(pitch < -1.57f)
+        pitch = -1.57f;
+    float radius = 10.0f;
+    float camX = sin(yaw) * radius;
+    float camZ = cos(yaw) * radius;
+    float camY = sin(pitch) * radius;
+    camPos = glm::vec3(camX, camY, camZ);
 }
