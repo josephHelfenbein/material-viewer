@@ -25,12 +25,15 @@ void mouseCallback(GLFWwindow* window, double xpos, double ypos);
 void processInput(GLFWwindow *window);
 char* getShaders(char file[]){
     FILE* shaderFile = fopen(file, "r");
+    if(!shaderFile) {
+        std::cout<<"Error opening shader file";
+        return nullptr;
+    }
     int fileSize = 0;
-    char* shader = NULL;
     fseek(shaderFile, 0, SEEK_END);
     fileSize = ftell(shaderFile);
     rewind(shaderFile);
-    shader = (char*)malloc(sizeof(char) * (fileSize+1));
+    char* shader = (char*)malloc(sizeof(char) * (fileSize+1));
     fread(shader, sizeof(char), fileSize, shaderFile);
     shader[fileSize] = '\0';
     fclose(shaderFile);
@@ -60,12 +63,12 @@ unsigned int loadEnv(std::vector<std::string> faces){
     glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
     return textureId;
 }
-char vertexLoc[] = "shaders/main.vert";
-char fragmentLoc[] = "shaders/main.frag";
+char vertexLoc[] = "./src/shaders/main.vert";
+char fragmentLoc[] = "./src/shaders/main.frag";
 const char* vertexShaderSource = getShaders(vertexLoc);
 const char* fragmentShaderSource = getShaders(fragmentLoc);
-char skyVertexLoc[] = "shaders/sky.vert";
-char skyFragmentLoc[] = "shaders/sky.frag";
+char skyVertexLoc[] = "./src/shaders/sky.vert";
+char skyFragmentLoc[] = "./src/shaders/sky.frag";
 const char* skyVertexShaderSource = getShaders(skyVertexLoc);
 const char* skyFragmentShaderSource = getShaders(skyFragmentLoc);
 int main()
@@ -82,8 +85,8 @@ int main()
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
     GLFWwindow* window;
-    window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "Material Viewer (Alpha)", NULL, NULL);
-    if (window == NULL)
+    window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "Material Viewer (Alpha)", nullptr, nullptr);
+    if (window == nullptr)
     {
         std::cout << "Failed to open GLFW window" << std::endl;
         glfwTerminate();
@@ -101,21 +104,21 @@ int main()
     glEnable(GL_DEPTH_TEST);
 
     unsigned int vertexShader = glCreateShader(GL_VERTEX_SHADER);
-    glShaderSource(vertexShader, 1, &vertexShaderSource, NULL);
+    glShaderSource(vertexShader, 1, &vertexShaderSource, nullptr);
     glCompileShader(vertexShader);
     int success;
     char infoLog[512];
     glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &success);
     if(!success){
-        glGetShaderInfoLog(vertexShader, 512, NULL, infoLog);
+        glGetShaderInfoLog(vertexShader, 512, nullptr, infoLog);
         std::cout << "Vertex shader compilation failed.\n"<<infoLog<<std::endl;
     }
     unsigned int fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
-    glShaderSource(fragmentShader, 1, &fragmentShaderSource, NULL);
+    glShaderSource(fragmentShader, 1, &fragmentShaderSource, nullptr);
     glCompileShader(fragmentShader);
     glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &success);
     if(!success){
-        glGetShaderInfoLog(fragmentShader, 512, NULL, infoLog);
+        glGetShaderInfoLog(fragmentShader, 512, nullptr, infoLog);
         std::cout << "Fragment shader compilation failed.\n"<<infoLog<<std::endl;
     }
     unsigned int shaderProgram = glCreateProgram();
@@ -124,7 +127,7 @@ int main()
     glLinkProgram(shaderProgram);
     glGetProgramiv(shaderProgram, GL_LINK_STATUS, &success);
     if(!success){
-        glGetProgramInfoLog(shaderProgram, 512, NULL, infoLog);
+        glGetProgramInfoLog(shaderProgram, 512, nullptr, infoLog);
         std::cout << "Linking shader program failed. \n"<<infoLog<<std::endl;
     }
     glDeleteShader(vertexShader);
@@ -188,12 +191,12 @@ int main()
     
 
     std::vector<std::string> faces = {
-        "environments/industrial_sunset_puresky/px.png",
-        "environments/industrial_sunset_puresky/nx.png",
-        "environments/industrial_sunset_puresky/py.png",
-        "environments/industrial_sunset_puresky/ny.png",
-        "environments/industrial_sunset_puresky/pz.png",
-        "environments/industrial_sunset_puresky/nz.png",
+        "./src/environments/industrial_sunset_puresky/px.png",
+        "./src/environments/industrial_sunset_puresky/nx.png",
+        "./src/environments/industrial_sunset_puresky/py.png",
+        "./src/environments/industrial_sunset_puresky/ny.png",
+        "./src/environments/industrial_sunset_puresky/pz.png",
+        "./src/environments/industrial_sunset_puresky/nz.png",
     };
     unsigned int cubemapTex = loadEnv(faces);
     float skyVertices[] = {       
@@ -251,19 +254,19 @@ int main()
     
 
     unsigned int skyVertexShader = glCreateShader(GL_VERTEX_SHADER);
-    glShaderSource(skyVertexShader, 1, &skyVertexShaderSource, NULL);
+    glShaderSource(skyVertexShader, 1, &skyVertexShaderSource, nullptr);
     glCompileShader(skyVertexShader);
     glGetShaderiv(skyVertexShader, GL_COMPILE_STATUS, &success);
     if(!success){
-        glGetShaderInfoLog(skyVertexShader, 512, NULL, infoLog);
+        glGetShaderInfoLog(skyVertexShader, 512, nullptr, infoLog);
         std::cout << "Skybox vertex shader compilation failed.\n"<<infoLog<<std::endl;
     }
     unsigned int skyFragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
-    glShaderSource(skyFragmentShader, 1, &skyFragmentShaderSource, NULL);
+    glShaderSource(skyFragmentShader, 1, &skyFragmentShaderSource, nullptr);
     glCompileShader(skyFragmentShader);
     glGetShaderiv(skyFragmentShader, GL_COMPILE_STATUS, &success);
     if(!success){
-        glGetShaderInfoLog(skyFragmentShader, 512, NULL, infoLog);
+        glGetShaderInfoLog(skyFragmentShader, 512, nullptr, infoLog);
         std::cout << "Skybox fragment shader compilation failed.\n"<<infoLog<<std::endl;
     }
     unsigned int skyShaderProgram = glCreateProgram();
@@ -272,7 +275,7 @@ int main()
     glLinkProgram(skyShaderProgram);
     glGetProgramiv(skyShaderProgram, GL_LINK_STATUS, &success);
     if(!success){
-        glGetProgramInfoLog(skyShaderProgram, 512, NULL, infoLog);
+        glGetProgramInfoLog(skyShaderProgram, 512, nullptr, infoLog);
         std::cout << "Linking skybox shader program failed. \n"<<infoLog<<std::endl;
     }
     glDeleteShader(skyVertexShader);

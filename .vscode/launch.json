@@ -1,0 +1,52 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Windows Debug (g++ exe)",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/materialviewer.exe",
+            "args": [], // Add any program arguments here
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": true,
+            "MIMode": "gdb",
+            "miDebuggerPath": "C:/msys64/ucrt64/bin/gdb.exe",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ],
+            "preLaunchTask": "Build Windows Executable", // Matches the task name
+            "internalConsoleOptions": "openOnSessionStart"
+        },
+        {
+            "name": "Linux Debug (g++)",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/materialviewer", // Path to your compiled executable
+            "args": [], // Command line arguments to pass to the program (if any)
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}", // Current working directory
+            "environment": [], // Environment variables (if any)
+            "externalConsole": false, // Use an external console
+            "MIMode": "gdb", // Specify the debugger (gdb for C++)
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ],
+            "preLaunchTask": "Build Linux Executable", // Task to run before launching
+            "miDebuggerPath": "/usr/bin/gdb", // Path to gdb (adjust as necessary)
+            "miDebuggerArgs": "", // Arguments for gdb (if any)
+            "logging": {
+                "engineLogging": true
+            }
+        }
+    ]
+}

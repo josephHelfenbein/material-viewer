@@ -3,7 +3,7 @@
 	"tasks": [
         {
             "type": "cppbuild",
-            "label": "C/C++: g++.exe build active file",
+            "label": "Build Windows Executable",
             "command": "C:\\msys64\\ucrt64\\bin\\g++.exe",
             "args": [
                 "-g",
@@ -27,6 +27,32 @@
                 "isDefault": true
             },
             "detail": "compiler: C:/C:/path/to/g++.exe"
+        },
+        {
+            "label": "Build Linux Executable",
+            "type": "shell",
+            "command": "g++",
+            "args": [
+                "-g",
+                "-std=c++17",
+                "-I${workspaceFolder}/include",
+                "-L${workspaceFolder}/lib",
+                "${workspaceFolder}/src/main.cpp",
+                "${workspaceFolder}/src/glad.c",
+                "-lglfw",
+                "-ldl",
+                "-lm",
+                "-o",
+                "${workspaceFolder}/materialviewer"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": ["$gcc"]
         }
     ]
 }
