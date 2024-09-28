@@ -1,5 +1,26 @@
 #version 330 core
-out vec4 FragColor;
+in vec3 normalVec;
+in vec3 texCoord;
+in vec3 FragPos;
+
+uniform samplerCube skybox;
+uniform vec3 camPos;
+
+out vec4 fragColor;
+
 void main(){ 
-    FragColor = vec4(1.0f, 0.5f, 0.2f, 1.0f);
+    vec3 viewDir = normalize(camPos - FragPos);
+    vec3 reflectionDir = reflect(-viewDir, normalVec);
+
+    vec4 tex = texture(skybox, reflectionDir);
+    vec4 ambient = vec4(1.0, 1.0, 1.0, 1.0);
+    vec4 diffuse = vec4(1.0, 1.0, 1.0, 1.0);
+    vec4 specular = vec4(1.0, 1.0, 1.0, 1.0);
+
+    float ambientAmount = 0.20;
+    float diffuseAmount = 0.40;
+    float specularAmount = 0.40;
+
+    fragColor = tex;
+    fragColor.a = 1.0;
 }
