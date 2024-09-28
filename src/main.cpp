@@ -10,9 +10,11 @@
 
 const unsigned int SCR_WIDTH=800;
 const unsigned int SCR_HEIGHT=600;
-glm::vec3 camPos = glm::vec3(0.0f, 0.0f, 3.0f);
-float yaw = -90.0f;
-float pitch = 0.0f;
+const float pi = 3.1415;
+float radius = 8.0f;
+float yaw = pi/8;
+float pitch = pi/12;
+glm::vec3 camPos = glm::vec3(sin(yaw)*radius, sin(pitch)*radius, cos(yaw)*radius);
 float lastX = SCR_WIDTH / 2.0;
 float lastY = SCR_HEIGHT / 2.0;
 float fov = 45.0f;
@@ -379,11 +381,10 @@ void mouseCallback(GLFWwindow* window, double xposIn, double yposIn){
     pitch += yOffset;
     if(pitch > 1.57)
         pitch =  1.57f;
-    if(pitch < -1.57f)
+    else if(pitch < -1.57f)
         pitch = -1.57f;
-    float radius = 10.0f;
     float camX = sin(yaw) * radius;
-    float camZ = cos(yaw) * radius;
     float camY = sin(pitch) * radius;
+    float camZ = cos(yaw) * radius;
     camPos = glm::vec3(camX, camY, camZ);
 }
