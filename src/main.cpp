@@ -70,6 +70,10 @@ char skyVertexLoc[] = "./src/shaders/sky.vert";
 char skyFragmentLoc[] = "./src/shaders/sky.frag";
 const char* skyVertexShaderSource = getShaders(skyVertexLoc);
 const char* skyFragmentShaderSource = getShaders(skyFragmentLoc);
+char cubemapVertexLoc[] = "./src/shaders/cubemap.vert";
+char cubemapFragmentLoc[] = "./src/shaders/cubemap.frag";
+const char* cubemapVertexShaderSource = getShaders(cubemapVertexLoc);
+const char* cubemapFragmentShaderSource = getShaders(cubemapFragmentLoc);
 int main()
 {
     if (!glfwInit())
@@ -192,8 +196,6 @@ int main()
     glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(5 * sizeof(float)));
     
 
-    char environmentLoc[] = "./src/environments/industrial_sunset_puresky/environment.hdr";
-    unsigned int cubemapTex = loadEnv(environmentLoc);
 
     float skyVertices[] = {       
         -1.0f,  1.0f, -1.0f,
@@ -278,7 +280,94 @@ int main()
     glDeleteShader(skyFragmentShader);
     glUseProgram(skyShaderProgram);
     glUniform1i(glGetUniformLocation(skyShaderProgram, "skybox"), 0); 
+
+
+    unsigned int cubeVBO, cubeVAO;
+    glGenVertexArrays(1, &cubeVAO);
+    glGenBuffers(1, &cubeVBO);
+    glBindVertexArray(cubeVAO);
+
+    glBindBuffer(GL_ARRAY_BUFFER, cubeVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(skyVertices), &skyVertices, GL_STATIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
     
+
+    unsigned int cubeVertexShader = glCreateShader(GL_VERTEX_SHADER);
+    glShaderSource(cubeVertexShader, 1, &cubemapVertexShaderSource, nullptr);
+    glCompileShader(cubeVertexShader);
+    glGetShaderiv(cubeVertexShader, GL_COMPILE_STATUS, &success);
+    if(!success){
+        glGetShaderInfoLog(cubeVertexShader, 512, nullptr, infoLog);
+        std::cout << "Cubemap vertex shader compilation failed.\n"<<infoLog<<std::endl;
+    }
+    unsigned int cubeFragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
+    glShaderSource(cubeFragmentShader, 1, &cubemapFragmentShaderSource, nullptr);
+    glCompileShader(cubeFragmentShader);
+    glGetShaderiv(cubeFragmentShader, GL_COMPILE_STATUS, &success);
+    if(!success){
+        glGetShaderInfoLog(cubeFragmentShader, 512, nullptr, infoLog);
+        std::cout << "Cubemap fragment shader compilation failed.\n"<<infoLog<<std::endl;
+    }
+    unsigned int cubemapShaderProgram = glCreateProgram();
+    glAttachShader(cubemapShaderProgram, cubeVertexShader);
+    glAttachShader(cubemapShaderProgram, cubeFragmentShader);
+    glLinkProgram(cubemapShaderProgram);
+    glGetProgramiv(cubemapShaderProgram, GL_LINK_STATUS, &success);
+    if(!success){
+        glGetProgramInfoLog(cubemapShaderProgram, 512, nullptr, infoLog);
+        std::cout << "Linking cubemap shader program failed. \n"<<infoLog<<std::endl;
+    }
+    glDeleteShader(cubeVertexShader);
+    glDeleteShader(cubeFragmentShader);
+    
+    unsigned int captureFBO;
+    unsigned int captureRBO;
+    glGenFramebuffers(1, &captureFBO);
+    glGenRenderbuffers(1, &captureRBO);
+    glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
+    glBindRenderbuffer(GL_RENDERBUFFER, captureRBO);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, 512, 512);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, captureRBO);
+    char environmentLoc[] = "./src/environments/industrial_sunset_puresky/environment.hdr";
+    unsigned int hdrTexture = loadEnv(environmentLoc);
+    unsigned int envCubemap;
+    glGenTextures(1, &envCubemap);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, envCubemap);
+    for(unsigned int i=0; i<6; i++){
+        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F, 512, 512, 0, GL_RGB, GL_FLOAT, nullptr);
+    }
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glm::mat4 captureProj = glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 10.0f);
+    glm::mat4 captureViews[] = {
+        glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(1.0f, 0.0f, 0.0f), glm::vec3(0.0f, -1.0f, 0.0f)),
+        glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(-1.0f, 0.0f, 0.0f), glm::vec3(0.0f, -1.0f, 0.0f)),
+        glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f)),
+        glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, -1.0f, 0.0f), glm::vec3(0.0f, 0.0f, -1.0f)),
+        glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f), glm::vec3(0.0f, -1.0f, 0.0f)),
+        glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, -1.0f, 0.0f)),
+    };
+    glUseProgram(cubemapShaderProgram);
+    glUniform1i(glGetUniformLocation(cubemapShaderProgram, "skybox"), 0); 
+    glUniformMatrix4fv(glGetUniformLocation(cubemapShaderProgram, "projection"), 1, GL_FALSE, &captureProj[0][0]);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, hdrTexture);
+    glViewport(0, 0, 512, 512);
+    glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
+    for(unsigned int i=0; i<6; i++){
+        glUniformMatrix4fv(glGetUniformLocation(cubemapShaderProgram, "view"), 1, GL_FALSE, &captureViews[i][0][0]);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, envCubemap, 0);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glBindVertexArray(cubeVAO);
+        glDrawArrays(GL_TRIANGLES, 0, 36);
+        glBindVertexArray(0);
+    }
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
 
 
     while(!glfwWindowShouldClose(window))
@@ -308,7 +397,7 @@ int main()
         glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "model"), 1, GL_FALSE, &model[0][0]);
 
         glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, cubemapTex);
+        glBindTexture(GL_TEXTURE_2D, envCubemap);
 
         glDrawArrays(GL_TRIANGLES, 0, 36);
         glBindVertexArray(0);
@@ -322,7 +411,7 @@ int main()
         glUniformMatrix4fv(glGetUniformLocation(skyShaderProgram, "projection"), 1, GL_FALSE, &projection[0][0]);
         glBindVertexArray(skyVAO);
         glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, cubemapTex);
+        glBindTexture(GL_TEXTURE_2D, envCubemap);
         glDrawArrays(GL_TRIANGLES, 0, 36);
         glBindVertexArray(0);
         glDepthRange(0.0f, 1.0f);  
