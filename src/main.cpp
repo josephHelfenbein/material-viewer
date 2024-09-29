@@ -41,29 +41,26 @@ char* getShaders(char file[]){
     fclose(shaderFile);
     return shader;
 }
-unsigned int loadEnv(std::vector<std::string> faces){
-    unsigned int textureId;
-    glGenTextures(1, &textureId);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, textureId);
-    int w, h, channels;
-    for(unsigned int i = 0; i<faces.size(); i++){
-        unsigned char* data = stbi_load(faces[i].c_str(), &w, &h, &channels, 0);
-        if(data){
-            glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
-            stbi_image_free(data);
-        }
-        else{
-            std::cout<<"Cubemap failed to load at path "<<faces[i]<<std::endl;
-            stbi_image_free(data);
-        }
+unsigned int loadEnv(char file[]){
+    stbi_set_flip_vertically_on_load(true);
+    int width, height, nrComponents;
+    float *data = stbi_loadf(file, &width, &height, &nrComponents, 0);
+    unsigned int hdrTexture;
+    if(data){
+        glGenTextures(1, &hdrTexture);
+        glBindTexture(GL_TEXTURE_2D, hdrTexture);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, width, height, 0, GL_RGB, GL_FLOAT, data);
+        stbi_image_free(data);
     }
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-    glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
-    return textureId;
+    else{
+        std::cout<<"HDR image failed to load at path "<<file<<std::endl;
+        stbi_image_free(data);
+    }
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    return hdrTexture;
 }
 char vertexLoc[] = "./src/shaders/main.vert";
 char fragmentLoc[] = "./src/shaders/main.frag";
@@ -195,15 +192,9 @@ int main()
     glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(5 * sizeof(float)));
     
 
-    std::vector<std::string> faces = {
-        "./src/environments/industrial_sunset_puresky/px.png",
-        "./src/environments/industrial_sunset_puresky/nx.png",
-        "./src/environments/industrial_sunset_puresky/py.png",
-        "./src/environments/industrial_sunset_puresky/ny.png",
-        "./src/environments/industrial_sunset_puresky/pz.png",
-        "./src/environments/industrial_sunset_puresky/nz.png",
-    };
-    unsigned int cubemapTex = loadEnv(faces);
+    char environmentLoc[] = "./src/environments/industrial_sunset_puresky/environment.hdr";
+    unsigned int cubemapTex = loadEnv(environmentLoc);
+
     float skyVertices[] = {       
         -1.0f,  1.0f, -1.0f,
         -1.0f, -1.0f, -1.0f,
@@ -317,7 +308,7 @@ int main()
         glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "model"), 1, GL_FALSE, &model[0][0]);
 
         glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_CUBE_MAP, cubemapTex);
+        glBindTexture(GL_TEXTURE_2D, cubemapTex);
 
         glDrawArrays(GL_TRIANGLES, 0, 36);
         glBindVertexArray(0);
@@ -331,7 +322,7 @@ int main()
         glUniformMatrix4fv(glGetUniformLocation(skyShaderProgram, "projection"), 1, GL_FALSE, &projection[0][0]);
         glBindVertexArray(skyVAO);
         glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_CUBE_MAP, cubemapTex);
+        glBindTexture(GL_TEXTURE_2D, cubemapTex);
         glDrawArrays(GL_TRIANGLES, 0, 36);
         glBindVertexArray(0);
         glDepthRange(0.0f, 1.0f);  
