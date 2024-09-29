@@ -62,6 +62,31 @@ unsigned int loadEnv(char file[]){
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     return hdrTexture;
 }
+unsigned int loadTexture(char file[]){
+    unsigned int textureID;
+    glGenTextures(2, &textureID);
+    int width, height, nrComponents;
+    unsigned char *data = stbi_load(file, &width, &height, &nrComponents, 0);
+    if(data){
+        GLenum format;
+        if(nrComponents == 1) format = GL_RED;
+        else if(nrComponents == 3) format = GL_RGB;
+        else if(nrComponents == 4) format = GL_RGBA;
+        glBindTexture(GL_TEXTURE_2D, textureID);
+        glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
+        glGenerateMipmap(GL_TEXTURE_2D);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        stbi_image_free(data);
+    }
+    else{
+        std::cout<<"Texture image filed to load at path "<<file<<std::endl;
+        stbi_image_free(data);
+    }
+    return textureID;
+}
 unsigned int createShader(const char* vertSource, const char* fragSource){
     unsigned int vertexShader = glCreateShader(GL_VERTEX_SHADER);
     glShaderSource(vertexShader, 1, &vertSource, nullptr);
@@ -189,6 +214,12 @@ char irradianceVertexLoc[] = "./src/shaders/irradiance.vert";
 char irradianceFragmentLoc[] = "./src/shaders/irradiance.frag";
 const char* irradianceVertexShaderSource = getShaders(irradianceVertexLoc);
 const char* irradianceFragmentShaderSource = getShaders(irradianceFragmentLoc);
+
+char albedoLoc[] = "./src/material/albedo.png";
+char aoLoc[] = "./src/material/ao.png";
+char metallicLoc[] = "./src/material/metallic.png";
+char normalLoc[] = "./src/material/normal.png";
+char roughnessLoc[] = "./src/material/roughness.png";
 
 char environmentLoc[] = "./src/environments/industrial_sunset_puresky/environment.hdr";
 
@@ -347,6 +378,12 @@ int main()
     unsigned int envCubemap = envMaps.first;
     unsigned int irradianceMap = envMaps.second;
 
+    unsigned int albedo = loadTexture(albedoLoc);
+    unsigned int metallic = loadTexture(metallicLoc);
+    unsigned int normal = loadTexture(normalLoc);
+    unsigned int roughness = loadTexture(roughnessLoc);
+    unsigned int ao = loadTexture(aoLoc);
+
     while(!glfwWindowShouldClose(window))
     {
         float currentFrame = static_cast<float>(glfwGetTime());
@@ -380,6 +417,23 @@ int main()
         glBindTexture(GL_TEXTURE_CUBE_MAP, envCubemap);
         glUniform1i(glGetUniformLocation(shaderProgram, "irradianceMap"), 0);
         glUniform1i(glGetUniformLocation(shaderProgram, "envCubemap"), 1);
+
+        glActiveTexture(GL_TEXTURE2);
+        glBindTexture(GL_TEXTURE_2D, albedo);
+        glUniform1i(glGetUniformLocation(shaderProgram, "albedoMap"), 2);
+        glActiveTexture(GL_TEXTURE3);
+        glBindTexture(GL_TEXTURE_2D, metallic);
+        glUniform1i(glGetUniformLocation(shaderProgram, "metallicMap"), 3);
+        glActiveTexture(GL_TEXTURE4);
+        glBindTexture(GL_TEXTURE_2D, normal);
+        glUniform1i(glGetUniformLocation(shaderProgram, "normalMap"), 4);
+        glActiveTexture(GL_TEXTURE5);
+        glBindTexture(GL_TEXTURE_2D, roughness);
+        glUniform1i(glGetUniformLocation(shaderProgram, "roughnessMap"), 5);
+        glActiveTexture(GL_TEXTURE6);
+        glBindTexture(GL_TEXTURE_2D, ao);
+        glUniform1i(glGetUniformLocation(shaderProgram, "aoMap"), 6);
+
 
         glDrawArrays(GL_TRIANGLES, 0, 36);
         glBindVertexArray(0);
