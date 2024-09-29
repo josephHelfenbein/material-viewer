@@ -62,6 +62,87 @@ unsigned int loadEnv(char file[]){
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     return hdrTexture;
 }
+unsigned int createShader(const char* vertSource, const char* fragSource){
+    unsigned int vertexShader = glCreateShader(GL_VERTEX_SHADER);
+    glShaderSource(vertexShader, 1, &vertSource, nullptr);
+    glCompileShader(vertexShader);
+    int success;
+    char infoLog[512];
+    glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &success);
+    if(!success){
+        glGetShaderInfoLog(vertexShader, 512, nullptr, infoLog);
+        std::cout<<"A vertex shader compilation failed.\n"<<infoLog<<std::endl;
+    }
+    unsigned int fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
+    glShaderSource(fragmentShader, 1, &fragSource, nullptr);
+    glCompileShader(fragmentShader);
+    glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &success);
+    if(!success){
+        glGetShaderInfoLog(fragmentShader, 512, nullptr, infoLog);
+        std::cout<<"A fragment shader compilation failed.\n"<<infoLog<<std::endl;
+    }
+    unsigned int shaderProgram = glCreateProgram();
+    glAttachShader(shaderProgram, vertexShader);
+    glAttachShader(shaderProgram, fragmentShader);
+    glLinkProgram(shaderProgram);
+    glGetProgramiv(shaderProgram, GL_LINK_STATUS, &success);
+    if(!success){
+        glGetProgramInfoLog(shaderProgram, 512, nullptr, infoLog);
+        std::cout << "Linking shader program failed. \n"<<infoLog<<std::endl;
+    }
+    glDeleteShader(vertexShader);
+    glDeleteShader(fragmentShader);
+    return shaderProgram;
+}
+unsigned int HDRItoCubemap(char environmentLoc[], unsigned int shaderProgram, unsigned int VAO){
+    unsigned int captureFBO;
+    unsigned int captureRBO;
+    glGenFramebuffers(1, &captureFBO);
+    glGenRenderbuffers(1, &captureRBO);
+    glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
+    glBindRenderbuffer(GL_RENDERBUFFER, captureRBO);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, 512, 512);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, captureRBO);
+    unsigned int hdrTexture = loadEnv(environmentLoc);
+    unsigned int envCubemap;
+    glGenTextures(1, &envCubemap);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, envCubemap);
+    for(unsigned int i=0; i<6; i++){
+        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F, 512, 512, 0, GL_RGB, GL_FLOAT, nullptr);
+    }
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glm::mat4 captureProj = glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 10.0f);
+    glm::mat4 captureViews[] = {
+        glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(1.0f, 0.0f, 0.0f), glm::vec3(0.0f, -1.0f, 0.0f)),
+        glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(-1.0f, 0.0f, 0.0f), glm::vec3(0.0f, -1.0f, 0.0f)),
+        glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f)),
+        glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, -1.0f, 0.0f), glm::vec3(0.0f, 0.0f, -1.0f)),
+        glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f), glm::vec3(0.0f, -1.0f, 0.0f)),
+        glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, -1.0f, 0.0f)),
+    };
+    glUseProgram(shaderProgram);
+    glUniform1i(glGetUniformLocation(shaderProgram, "skybox"), 0); 
+    glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "projection"), 1, GL_FALSE, &captureProj[0][0]);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, hdrTexture);
+    glViewport(0, 0, 512, 512);
+    glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
+    for(unsigned int i=0; i<6; i++){
+        glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "view"), 1, GL_FALSE, &captureViews[i][0][0]);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, envCubemap, 0);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glBindVertexArray(VAO);
+        glDrawArrays(GL_TRIANGLES, 0, 36);
+        glBindVertexArray(0);
+    }
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
+    return envCubemap;
+}
 char vertexLoc[] = "./src/shaders/main.vert";
 char fragmentLoc[] = "./src/shaders/main.frag";
 const char* vertexShaderSource = getShaders(vertexLoc);
@@ -74,6 +155,9 @@ char cubemapVertexLoc[] = "./src/shaders/cubemap.vert";
 char cubemapFragmentLoc[] = "./src/shaders/cubemap.frag";
 const char* cubemapVertexShaderSource = getShaders(cubemapVertexLoc);
 const char* cubemapFragmentShaderSource = getShaders(cubemapFragmentLoc);
+
+char environmentLoc[] = "./src/environments/industrial_sunset_puresky/environment.hdr";
+
 int main()
 {
     if (!glfwInit())
@@ -105,37 +189,6 @@ int main()
         return -1;
     }
     glEnable(GL_DEPTH_TEST);
-
-    unsigned int vertexShader = glCreateShader(GL_VERTEX_SHADER);
-    glShaderSource(vertexShader, 1, &vertexShaderSource, nullptr);
-    glCompileShader(vertexShader);
-    int success;
-    char infoLog[512];
-    glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &success);
-    if(!success){
-        glGetShaderInfoLog(vertexShader, 512, nullptr, infoLog);
-        std::cout << "Vertex shader compilation failed.\n"<<infoLog<<std::endl;
-    }
-    unsigned int fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
-    glShaderSource(fragmentShader, 1, &fragmentShaderSource, nullptr);
-    glCompileShader(fragmentShader);
-    glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &success);
-    if(!success){
-        glGetShaderInfoLog(fragmentShader, 512, nullptr, infoLog);
-        std::cout << "Fragment shader compilation failed.\n"<<infoLog<<std::endl;
-    }
-    unsigned int shaderProgram = glCreateProgram();
-    glAttachShader(shaderProgram, vertexShader);
-    glAttachShader(shaderProgram, fragmentShader);
-    glLinkProgram(shaderProgram);
-    glGetProgramiv(shaderProgram, GL_LINK_STATUS, &success);
-    if(!success){
-        glGetProgramInfoLog(shaderProgram, 512, nullptr, infoLog);
-        std::cout << "Linking shader program failed. \n"<<infoLog<<std::endl;
-    }
-    glDeleteShader(vertexShader);
-    glDeleteShader(fragmentShader);
-
 
     float vertices[] = {
         // vertex position,  texture coordinate,  normal vector
@@ -195,7 +248,7 @@ int main()
     glEnableVertexAttribArray(2);
     glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(5 * sizeof(float)));
     
-
+    unsigned int shaderProgram = createShader(vertexShaderSource, fragmentShaderSource);
 
     float skyVertices[] = {       
         -1.0f,  1.0f, -1.0f,
@@ -250,124 +303,11 @@ int main()
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
     
+    unsigned int skyShaderProgram = createShader(skyVertexShaderSource, skyFragmentShaderSource);
 
-    unsigned int skyVertexShader = glCreateShader(GL_VERTEX_SHADER);
-    glShaderSource(skyVertexShader, 1, &skyVertexShaderSource, nullptr);
-    glCompileShader(skyVertexShader);
-    glGetShaderiv(skyVertexShader, GL_COMPILE_STATUS, &success);
-    if(!success){
-        glGetShaderInfoLog(skyVertexShader, 512, nullptr, infoLog);
-        std::cout << "Skybox vertex shader compilation failed.\n"<<infoLog<<std::endl;
-    }
-    unsigned int skyFragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
-    glShaderSource(skyFragmentShader, 1, &skyFragmentShaderSource, nullptr);
-    glCompileShader(skyFragmentShader);
-    glGetShaderiv(skyFragmentShader, GL_COMPILE_STATUS, &success);
-    if(!success){
-        glGetShaderInfoLog(skyFragmentShader, 512, nullptr, infoLog);
-        std::cout << "Skybox fragment shader compilation failed.\n"<<infoLog<<std::endl;
-    }
-    unsigned int skyShaderProgram = glCreateProgram();
-    glAttachShader(skyShaderProgram, skyVertexShader);
-    glAttachShader(skyShaderProgram, skyFragmentShader);
-    glLinkProgram(skyShaderProgram);
-    glGetProgramiv(skyShaderProgram, GL_LINK_STATUS, &success);
-    if(!success){
-        glGetProgramInfoLog(skyShaderProgram, 512, nullptr, infoLog);
-        std::cout << "Linking skybox shader program failed. \n"<<infoLog<<std::endl;
-    }
-    glDeleteShader(skyVertexShader);
-    glDeleteShader(skyFragmentShader);
-    glUseProgram(skyShaderProgram);
-    glUniform1i(glGetUniformLocation(skyShaderProgram, "skybox"), 0); 
-
-
-    unsigned int cubeVBO, cubeVAO;
-    glGenVertexArrays(1, &cubeVAO);
-    glGenBuffers(1, &cubeVBO);
-    glBindVertexArray(cubeVAO);
-
-    glBindBuffer(GL_ARRAY_BUFFER, cubeVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(skyVertices), &skyVertices, GL_STATIC_DRAW);
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+    unsigned int cubemapShaderProgram = createShader(cubemapVertexShaderSource, cubemapFragmentShaderSource);
     
-
-    unsigned int cubeVertexShader = glCreateShader(GL_VERTEX_SHADER);
-    glShaderSource(cubeVertexShader, 1, &cubemapVertexShaderSource, nullptr);
-    glCompileShader(cubeVertexShader);
-    glGetShaderiv(cubeVertexShader, GL_COMPILE_STATUS, &success);
-    if(!success){
-        glGetShaderInfoLog(cubeVertexShader, 512, nullptr, infoLog);
-        std::cout << "Cubemap vertex shader compilation failed.\n"<<infoLog<<std::endl;
-    }
-    unsigned int cubeFragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
-    glShaderSource(cubeFragmentShader, 1, &cubemapFragmentShaderSource, nullptr);
-    glCompileShader(cubeFragmentShader);
-    glGetShaderiv(cubeFragmentShader, GL_COMPILE_STATUS, &success);
-    if(!success){
-        glGetShaderInfoLog(cubeFragmentShader, 512, nullptr, infoLog);
-        std::cout << "Cubemap fragment shader compilation failed.\n"<<infoLog<<std::endl;
-    }
-    unsigned int cubemapShaderProgram = glCreateProgram();
-    glAttachShader(cubemapShaderProgram, cubeVertexShader);
-    glAttachShader(cubemapShaderProgram, cubeFragmentShader);
-    glLinkProgram(cubemapShaderProgram);
-    glGetProgramiv(cubemapShaderProgram, GL_LINK_STATUS, &success);
-    if(!success){
-        glGetProgramInfoLog(cubemapShaderProgram, 512, nullptr, infoLog);
-        std::cout << "Linking cubemap shader program failed. \n"<<infoLog<<std::endl;
-    }
-    glDeleteShader(cubeVertexShader);
-    glDeleteShader(cubeFragmentShader);
-    
-    unsigned int captureFBO;
-    unsigned int captureRBO;
-    glGenFramebuffers(1, &captureFBO);
-    glGenRenderbuffers(1, &captureRBO);
-    glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
-    glBindRenderbuffer(GL_RENDERBUFFER, captureRBO);
-    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, 512, 512);
-    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, captureRBO);
-    char environmentLoc[] = "./src/environments/industrial_sunset_puresky/environment.hdr";
-    unsigned int hdrTexture = loadEnv(environmentLoc);
-    unsigned int envCubemap;
-    glGenTextures(1, &envCubemap);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, envCubemap);
-    for(unsigned int i=0; i<6; i++){
-        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F, 512, 512, 0, GL_RGB, GL_FLOAT, nullptr);
-    }
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glm::mat4 captureProj = glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 10.0f);
-    glm::mat4 captureViews[] = {
-        glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(1.0f, 0.0f, 0.0f), glm::vec3(0.0f, -1.0f, 0.0f)),
-        glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(-1.0f, 0.0f, 0.0f), glm::vec3(0.0f, -1.0f, 0.0f)),
-        glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f)),
-        glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, -1.0f, 0.0f), glm::vec3(0.0f, 0.0f, -1.0f)),
-        glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f), glm::vec3(0.0f, -1.0f, 0.0f)),
-        glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, -1.0f, 0.0f)),
-    };
-    glUseProgram(cubemapShaderProgram);
-    glUniform1i(glGetUniformLocation(cubemapShaderProgram, "skybox"), 0); 
-    glUniformMatrix4fv(glGetUniformLocation(cubemapShaderProgram, "projection"), 1, GL_FALSE, &captureProj[0][0]);
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, hdrTexture);
-    glViewport(0, 0, 512, 512);
-    glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
-    for(unsigned int i=0; i<6; i++){
-        glUniformMatrix4fv(glGetUniformLocation(cubemapShaderProgram, "view"), 1, GL_FALSE, &captureViews[i][0][0]);
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, envCubemap, 0);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        glBindVertexArray(cubeVAO);
-        glDrawArrays(GL_TRIANGLES, 0, 36);
-        glBindVertexArray(0);
-    }
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
+    unsigned int envCubemap = HDRItoCubemap(environmentLoc, cubemapShaderProgram, skyVAO);
 
 
     while(!glfwWindowShouldClose(window))
