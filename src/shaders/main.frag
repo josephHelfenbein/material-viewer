@@ -5,6 +5,8 @@ in vec3 FragPos;
 
 uniform samplerCube irradianceMap;
 uniform samplerCube envCubemap;
+uniform samplerCube prefilterMap;
+uniform sampler2D brdfMap;
 
 const float PI = 3.14159265359;
 
@@ -63,27 +65,27 @@ void main(){
     float ao = texture(aoMap, texCoord).r;
 
     vec3 viewDir = normalize(camPos - FragPos);
-    vec3 reflectionDir = reflect(-viewDir, normalVec);
+    vec3 reflectionDir = reflect(-viewDir, normal);
 
     vec3 F0 = vec3(0.04);
     F0 = mix(F0, albedo, metallic);
 
-    vec3 reflection = texture(envCubemap, normalize(reflectionDir)).rgb;
-    reflection = reflection / (reflection + vec3(1.0));
-    reflection = pow(reflection, vec3(1.0/2.2));
-
-    vec3 kS = fresnelShlickRoughness(max(dot(normalVec, viewDir), 0.0), F0, roughness);
+    vec3 kS = fresnelShlickRoughness(max(dot(normal, viewDir), 0.0), F0, roughness);
     vec3 kD = 1.0 - kS;
     kD *= 1.0 - metallic;
-    vec3 irradiance = texture(irradianceMap, normalVec).rgb;
+    vec3 irradiance = texture(irradianceMap, normal).rgb;
 
     vec3 diffuse = irradiance * albedo;
-    vec3 specular = reflection;
-    vec3 ambient = (kD * diffuse) * ao;
+
+    const float MAX_REFLECTION_LOD = 4.0;
+    vec3 prefilteredColor = textureLod(prefilterMap, reflectionDir, roughness * MAX_REFLECTION_LOD).rgb;
+    vec2 brdf = texture(brdfMap, vec2(max(dot(normal, viewDir), 0.0), roughness)).rg;
+    vec3 specular = prefilteredColor * (kS * brdf.x + brdf.y);
+    vec3 ambient = (kD * diffuse + specular) * ao;
 
     vec3 color = ambient;
     color = color / (color + vec3(1.0));
     color = pow(color, vec3(1.0/2.2));
 
-    FragColor = vec4(albedo, 1.0);
+    FragColor = vec4(color, 1.0);
 }

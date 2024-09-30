@@ -119,7 +119,7 @@ unsigned int createShader(const char* vertSource, const char* fragSource){
     glDeleteShader(fragmentShader);
     return shaderProgram;
 }
-std::pair<std::pair<unsigned int, unsigned int>, unsigned int> HDRItoCubemap(char environmentLoc[], unsigned int skyProgram, unsigned int irradianceProgram, unsigned int prefilterProgram, unsigned int VAO){
+std::pair<std::pair<unsigned int, unsigned int>, std::pair<unsigned int, unsigned int>> HDRItoCubemap(char environmentLoc[], unsigned int skyProgram, unsigned int irradianceProgram, unsigned int prefilterProgram, unsigned int brdfProgram, unsigned int VAO, unsigned int quadVAO){
     unsigned int captureFBO;
     unsigned int captureRBO;
     glGenFramebuffers(1, &captureFBO);
@@ -138,7 +138,7 @@ std::pair<std::pair<unsigned int, unsigned int>, unsigned int> HDRItoCubemap(cha
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glm::mat4 captureProj = glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 10.0f);
     glm::mat4 captureViews[] = {
@@ -165,6 +165,8 @@ std::pair<std::pair<unsigned int, unsigned int>, unsigned int> HDRItoCubemap(cha
         glBindVertexArray(0);
     }
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, envCubemap);
+    glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
     unsigned int irradianceMap;
     glGenTextures(1, &irradianceMap);
     glBindTexture(GL_TEXTURE_CUBE_MAP, irradianceMap);
@@ -197,7 +199,7 @@ std::pair<std::pair<unsigned int, unsigned int>, unsigned int> HDRItoCubemap(cha
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     unsigned int prefilterMap;
     glGenTextures(1, &prefilterMap);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, irradianceMap);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, prefilterMap);
     for(unsigned int i=0; i<6; i++){
         glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F, 128, 128, 0, GL_RGB, GL_FLOAT, nullptr);
     }
@@ -208,7 +210,8 @@ std::pair<std::pair<unsigned int, unsigned int>, unsigned int> HDRItoCubemap(cha
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
     glUseProgram(prefilterProgram);
-    glUniform1i(glGetUniformLocation(irradianceProgram, "skybox"), 0); 
+    glUniform1i(glGetUniformLocation(prefilterProgram, "skybox"), 0); 
+    glUniformMatrix4fv(glGetUniformLocation(prefilterProgram, "projection"), 1, GL_FALSE, &captureProj[0][0]);
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_CUBE_MAP, envCubemap);
     glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
@@ -220,9 +223,9 @@ std::pair<std::pair<unsigned int, unsigned int>, unsigned int> HDRItoCubemap(cha
         glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, mipWidth, mipHeight);
         glViewport(0, 0, mipWidth, mipHeight);
         float roughness = (float)mip / (float)(maxMipLevels - 1);
-        glUniform1f(glGetUniformLocation(irradianceProgram, "roughness"), roughness); 
+        glUniform1f(glGetUniformLocation(prefilterProgram, "roughness"), roughness); 
         for(unsigned int i=0; i<6; i++){
-            glUniformMatrix4fv(glGetUniformLocation(irradianceProgram, "view"), 1, GL_FALSE, &captureViews[i][0][0]);
+            glUniformMatrix4fv(glGetUniformLocation(prefilterProgram, "view"), 1, GL_FALSE, &captureViews[i][0][0]);
             glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, prefilterMap, mip);
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
             glBindVertexArray(VAO);
@@ -231,8 +234,27 @@ std::pair<std::pair<unsigned int, unsigned int>, unsigned int> HDRItoCubemap(cha
         }
     }
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    unsigned int brdfLUTTexture;
+    glGenTextures(1, &brdfLUTTexture);
+    glBindTexture(GL_TEXTURE_2D, brdfLUTTexture);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RG16F, 512, 512, 0, GL_RG, GL_FLOAT, 0);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
+    glBindRenderbuffer(GL_RENDERBUFFER, captureRBO);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, 512, 512);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, brdfLUTTexture, 0);
+    glViewport(0, 0, 512, 512);
+    glUseProgram(brdfProgram);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glBindVertexArray(quadVAO);
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    glBindVertexArray(0);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
-    return {{envCubemap, irradianceMap}, prefilterMap};
+    return {{envCubemap, irradianceMap}, {prefilterMap, brdfLUTTexture}};
 }
 char vertexLoc[] = "./src/shaders/main.vert";
 char fragmentLoc[] = "./src/shaders/main.frag";
@@ -248,6 +270,10 @@ char irradianceFragmentLoc[] = "./src/shaders/irradiance.frag";
 const char* irradianceFragmentShaderSource = getShaders(irradianceFragmentLoc);
 char prefilterFragmentLoc[] = "./src/shaders/prefilter.frag";
 const char* prefilterFragmentShaderSource = getShaders(prefilterFragmentLoc);
+char brdfFragmentLoc[] = "./src/shaders/brdf.frag";
+char brdfVertexLoc[] = "./src/shaders/brdf.vert";
+const char* brdfFragmentShaderSource = getShaders(brdfFragmentLoc);
+const char* brdfVertexShaderSource = getShaders(brdfVertexLoc);
 
 char albedoLoc[] = "./src/material/albedo.png";
 char aoLoc[] = "./src/material/ao.png";
@@ -288,6 +314,7 @@ int main()
         return -1;
     }
     glEnable(GL_DEPTH_TEST);
+    glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
 
     float vertices[] = {
         // vertex position,  texture coordinate,  normal vector
@@ -410,10 +437,31 @@ int main()
 
     unsigned int prefilterShaderProgram = createShader(cubemapVertexShaderSource, prefilterFragmentShaderSource);
 
-    std::pair<std::pair<unsigned int, unsigned int>, unsigned int> envMaps = HDRItoCubemap(environmentLoc, cubemapShaderProgram, irradianceShaderProgram, prefilterShaderProgram, skyVAO);
+    unsigned int brdfShaderProgram = createShader(brdfVertexShaderSource, brdfFragmentShaderSource);
+
+    unsigned int quadVAO;
+    unsigned int quadVBO;
+    float quadVertices[] = {
+        -1.0f, 1.0f, 0.0f,  0.0f, 1.0f,
+        -1.0f, -1.0f, 0.0f,  0.0f, 0.0f,
+        1.0f, 1.0f, 0.0f,  1.0f, 1.0f,
+        1.0f, -1.0f, 0.0f,  1.0f, 0.0f,
+    };
+    glGenVertexArrays(1, &quadVAO);
+    glGenBuffers(1, &quadVBO);
+    glBindVertexArray(quadVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
+
+    std::pair<std::pair<unsigned int, unsigned int>, std::pair<unsigned int, unsigned int>> envMaps = HDRItoCubemap(environmentLoc, cubemapShaderProgram, irradianceShaderProgram, prefilterShaderProgram, brdfShaderProgram, skyVAO, quadVAO);
     unsigned int envCubemap = envMaps.first.first;
     unsigned int irradianceMap = envMaps.first.second;
-    unsigned int prefilterMap = envMaps.second;
+    unsigned int prefilterMap = envMaps.second.first;
+    unsigned int brdfMap = envMaps.second.second;
 
     unsigned int albedo = loadTexture(albedoLoc);
     unsigned int metallic = loadTexture(metallicLoc);
@@ -452,24 +500,30 @@ int main()
         glBindTexture(GL_TEXTURE_CUBE_MAP, irradianceMap);
         glActiveTexture(GL_TEXTURE1);
         glBindTexture(GL_TEXTURE_CUBE_MAP, envCubemap);
+        glActiveTexture(GL_TEXTURE2);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, prefilterMap);
+        glActiveTexture(GL_TEXTURE3);
+        glBindTexture(GL_TEXTURE_2D, brdfMap);
         glUniform1i(glGetUniformLocation(shaderProgram, "irradianceMap"), 0);
         glUniform1i(glGetUniformLocation(shaderProgram, "envCubemap"), 1);
+        glUniform1i(glGetUniformLocation(shaderProgram, "prefilterMap"), 2);
+        glUniform1i(glGetUniformLocation(shaderProgram, "brdfMap"), 3);
 
-        glActiveTexture(GL_TEXTURE2);
-        glBindTexture(GL_TEXTURE_2D, albedo);
-        glUniform1i(glGetUniformLocation(shaderProgram, "albedoMap"), 2);
-        glActiveTexture(GL_TEXTURE3);
-        glBindTexture(GL_TEXTURE_2D, metallic);
-        glUniform1i(glGetUniformLocation(shaderProgram, "metallicMap"), 3);
         glActiveTexture(GL_TEXTURE4);
-        glBindTexture(GL_TEXTURE_2D, normal);
-        glUniform1i(glGetUniformLocation(shaderProgram, "normalMap"), 4);
+        glBindTexture(GL_TEXTURE_2D, albedo);
+        glUniform1i(glGetUniformLocation(shaderProgram, "albedoMap"), 4);
         glActiveTexture(GL_TEXTURE5);
-        glBindTexture(GL_TEXTURE_2D, roughness);
-        glUniform1i(glGetUniformLocation(shaderProgram, "roughnessMap"), 5);
+        glBindTexture(GL_TEXTURE_2D, metallic);
+        glUniform1i(glGetUniformLocation(shaderProgram, "metallicMap"), 5);
         glActiveTexture(GL_TEXTURE6);
+        glBindTexture(GL_TEXTURE_2D, normal);
+        glUniform1i(glGetUniformLocation(shaderProgram, "normalMap"), 6);
+        glActiveTexture(GL_TEXTURE7);
+        glBindTexture(GL_TEXTURE_2D, roughness);
+        glUniform1i(glGetUniformLocation(shaderProgram, "roughnessMap"), 7);
+        glActiveTexture(GL_TEXTURE8);
         glBindTexture(GL_TEXTURE_2D, ao);
-        glUniform1i(glGetUniformLocation(shaderProgram, "aoMap"), 6);
+        glUniform1i(glGetUniformLocation(shaderProgram, "aoMap"), 8);
 
 
         glDrawArrays(GL_TRIANGLES, 0, 36);
