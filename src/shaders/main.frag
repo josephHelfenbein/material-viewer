@@ -78,12 +78,12 @@ void main(){
     vec3 irradiance = texture(irradianceMap, normalVec).rgb;
 
     vec3 diffuse = irradiance * albedo;
+    vec3 specular = reflection;
     vec3 ambient = (kD * diffuse) * ao;
-    vec3 specular = vec3(1.0, 1.0, 1.0);
 
     vec3 color = ambient;
     color = color / (color + vec3(1.0));
     color = pow(color, vec3(1.0/2.2));
 
-    FragColor = vec4(color, 1.0);
+    FragColor = vec4(albedo, 1.0);
 }

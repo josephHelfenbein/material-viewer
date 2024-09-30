@@ -119,7 +119,7 @@ unsigned int createShader(const char* vertSource, const char* fragSource){
     glDeleteShader(fragmentShader);
     return shaderProgram;
 }
-std::pair<unsigned int, unsigned int> HDRItoCubemap(char environmentLoc[], unsigned int skyProgram, unsigned int irradianceProgram, unsigned int VAO){
+std::pair<std::pair<unsigned int, unsigned int>, unsigned int> HDRItoCubemap(char environmentLoc[], unsigned int skyProgram, unsigned int irradianceProgram, unsigned int prefilterProgram, unsigned int VAO){
     unsigned int captureFBO;
     unsigned int captureRBO;
     glGenFramebuffers(1, &captureFBO);
@@ -195,25 +195,59 @@ std::pair<unsigned int, unsigned int> HDRItoCubemap(char environmentLoc[], unsig
         glBindVertexArray(0);
     }
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    unsigned int prefilterMap;
+    glGenTextures(1, &prefilterMap);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, irradianceMap);
+    for(unsigned int i=0; i<6; i++){
+        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F, 128, 128, 0, GL_RGB, GL_FLOAT, nullptr);
+    }
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
+    glUseProgram(prefilterProgram);
+    glUniform1i(glGetUniformLocation(irradianceProgram, "skybox"), 0); 
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, envCubemap);
+    glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
+    unsigned int maxMipLevels = 5;
+    for(unsigned int mip = 0; mip<maxMipLevels; mip++){
+        unsigned int mipWidth = static_cast<unsigned int>(128 * std::pow(0.5, mip));
+        unsigned int mipHeight = static_cast<unsigned int>(128 * std::pow(0.5, mip));
+        glBindRenderbuffer(GL_RENDERBUFFER, captureRBO);
+        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, mipWidth, mipHeight);
+        glViewport(0, 0, mipWidth, mipHeight);
+        float roughness = (float)mip / (float)(maxMipLevels - 1);
+        glUniform1f(glGetUniformLocation(irradianceProgram, "roughness"), roughness); 
+        for(unsigned int i=0; i<6; i++){
+            glUniformMatrix4fv(glGetUniformLocation(irradianceProgram, "view"), 1, GL_FALSE, &captureViews[i][0][0]);
+            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, prefilterMap, mip);
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+            glBindVertexArray(VAO);
+            glDrawArrays(GL_TRIANGLES, 0, 36);
+            glBindVertexArray(0);
+        }
+    }
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
-    return {envCubemap, irradianceMap};
+    return {{envCubemap, irradianceMap}, prefilterMap};
 }
 char vertexLoc[] = "./src/shaders/main.vert";
 char fragmentLoc[] = "./src/shaders/main.frag";
 const char* vertexShaderSource = getShaders(vertexLoc);
 const char* fragmentShaderSource = getShaders(fragmentLoc);
-char skyVertexLoc[] = "./src/shaders/sky.vert";
 char skyFragmentLoc[] = "./src/shaders/sky.frag";
-const char* skyVertexShaderSource = getShaders(skyVertexLoc);
 const char* skyFragmentShaderSource = getShaders(skyFragmentLoc);
 char cubemapVertexLoc[] = "./src/shaders/cubemap.vert";
 char cubemapFragmentLoc[] = "./src/shaders/cubemap.frag";
 const char* cubemapVertexShaderSource = getShaders(cubemapVertexLoc);
 const char* cubemapFragmentShaderSource = getShaders(cubemapFragmentLoc);
-char irradianceVertexLoc[] = "./src/shaders/irradiance.vert";
 char irradianceFragmentLoc[] = "./src/shaders/irradiance.frag";
-const char* irradianceVertexShaderSource = getShaders(irradianceVertexLoc);
 const char* irradianceFragmentShaderSource = getShaders(irradianceFragmentLoc);
+char prefilterFragmentLoc[] = "./src/shaders/prefilter.frag";
+const char* prefilterFragmentShaderSource = getShaders(prefilterFragmentLoc);
 
 char albedoLoc[] = "./src/material/albedo.png";
 char aoLoc[] = "./src/material/ao.png";
@@ -368,15 +402,18 @@ int main()
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
     
-    unsigned int skyShaderProgram = createShader(skyVertexShaderSource, skyFragmentShaderSource);
+    unsigned int skyShaderProgram = createShader(cubemapVertexShaderSource, skyFragmentShaderSource);
 
     unsigned int cubemapShaderProgram = createShader(cubemapVertexShaderSource, cubemapFragmentShaderSource);
     
-    unsigned int irradianceShaderProgram = createShader(irradianceVertexShaderSource, irradianceFragmentShaderSource);
+    unsigned int irradianceShaderProgram = createShader(cubemapVertexShaderSource, irradianceFragmentShaderSource);
 
-    std::pair<unsigned int, unsigned int> envMaps = HDRItoCubemap(environmentLoc, cubemapShaderProgram, irradianceShaderProgram, skyVAO);
-    unsigned int envCubemap = envMaps.first;
-    unsigned int irradianceMap = envMaps.second;
+    unsigned int prefilterShaderProgram = createShader(cubemapVertexShaderSource, prefilterFragmentShaderSource);
+
+    std::pair<std::pair<unsigned int, unsigned int>, unsigned int> envMaps = HDRItoCubemap(environmentLoc, cubemapShaderProgram, irradianceShaderProgram, prefilterShaderProgram, skyVAO);
+    unsigned int envCubemap = envMaps.first.first;
+    unsigned int irradianceMap = envMaps.first.second;
+    unsigned int prefilterMap = envMaps.second;
 
     unsigned int albedo = loadTexture(albedoLoc);
     unsigned int metallic = loadTexture(metallicLoc);
