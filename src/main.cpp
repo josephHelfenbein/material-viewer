@@ -28,7 +28,7 @@ void processInput(GLFWwindow *window);
 char* getShaders(char file[]){
     FILE* shaderFile = fopen(file, "r");
     if(!shaderFile) {
-        std::cout<<"Error opening shader file";
+        std::cout<<"Error opening shader file at "<<file<<"\n";
         return nullptr;
     }
     int fileSize = 0;
@@ -256,32 +256,32 @@ std::pair<std::pair<unsigned int, unsigned int>, std::pair<unsigned int, unsigne
     glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
     return {{envCubemap, irradianceMap}, {prefilterMap, brdfLUTTexture}};
 }
+
 char vertexLoc[] = "./src/shaders/main.vert";
 char fragmentLoc[] = "./src/shaders/main.frag";
-const char* vertexShaderSource = getShaders(vertexLoc);
-const char* fragmentShaderSource = getShaders(fragmentLoc);
 char skyFragmentLoc[] = "./src/shaders/sky.frag";
-const char* skyFragmentShaderSource = getShaders(skyFragmentLoc);
 char cubemapVertexLoc[] = "./src/shaders/cubemap.vert";
 char cubemapFragmentLoc[] = "./src/shaders/cubemap.frag";
-const char* cubemapVertexShaderSource = getShaders(cubemapVertexLoc);
-const char* cubemapFragmentShaderSource = getShaders(cubemapFragmentLoc);
 char irradianceFragmentLoc[] = "./src/shaders/irradiance.frag";
-const char* irradianceFragmentShaderSource = getShaders(irradianceFragmentLoc);
 char prefilterFragmentLoc[] = "./src/shaders/prefilter.frag";
-const char* prefilterFragmentShaderSource = getShaders(prefilterFragmentLoc);
 char brdfFragmentLoc[] = "./src/shaders/brdf.frag";
 char brdfVertexLoc[] = "./src/shaders/brdf.vert";
+const char* vertexShaderSource = getShaders(vertexLoc);
+const char* fragmentShaderSource = getShaders(fragmentLoc);
+const char* skyFragmentShaderSource = getShaders(skyFragmentLoc);
+const char* cubemapVertexShaderSource = getShaders(cubemapVertexLoc);
+const char* cubemapFragmentShaderSource = getShaders(cubemapFragmentLoc);
+const char* irradianceFragmentShaderSource = getShaders(irradianceFragmentLoc);
+const char* prefilterFragmentShaderSource = getShaders(prefilterFragmentLoc);
 const char* brdfFragmentShaderSource = getShaders(brdfFragmentLoc);
 const char* brdfVertexShaderSource = getShaders(brdfVertexLoc);
-
 char albedoLoc[] = "./src/material/albedo.png";
 char aoLoc[] = "./src/material/ao.png";
 char metallicLoc[] = "./src/material/metallic.png";
 char normalLoc[] = "./src/material/normal.png";
 char roughnessLoc[] = "./src/material/roughness.png";
-
 char environmentLoc[] = "./src/environments/industrial_sunset_puresky/environment.hdr";
+
 
 int main()
 {
