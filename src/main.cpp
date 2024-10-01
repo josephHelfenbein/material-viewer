@@ -11,7 +11,7 @@
 unsigned int SCR_WIDTH=800;
 unsigned int SCR_HEIGHT=600;
 const float pi = 3.14159265359;
-float radius = 8.0f;
+float radius = 7.0f;
 float yaw = pi/8;
 float pitch = pi/12;
 glm::vec3 camPos = glm::vec3(sin(yaw)*radius, sin(pitch)*radius, cos(yaw)*radius);
@@ -373,7 +373,74 @@ int main()
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
     glEnableVertexAttribArray(2);
     glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(5 * sizeof(float)));
-    
+
+    unsigned int indexCount;
+    std::vector<glm::vec3> positions;
+    std::vector<glm::vec2> uv;
+    std::vector<glm::vec3> normals;
+    std::vector<unsigned int> indices;
+    const unsigned int X_SEGMENTS = 64;
+    const unsigned int Y_SEGMENTS = 64;
+    for(unsigned int x=0; x<=X_SEGMENTS; x++){
+        for(unsigned int y=0; y<=Y_SEGMENTS; y++){
+            float xSegment = (float)x / (float)X_SEGMENTS;
+            float ySegment = (float)y / (float)Y_SEGMENTS;
+            float xPos = std::cos(xSegment * 2.0 * pi) * std::sin(ySegment * pi);
+            float yPos = std::cos(ySegment * pi);
+            float zPos = std::sin(xSegment * 2.0f * pi) * std::sin(ySegment * pi);
+            positions.push_back(glm::vec3(xPos, yPos, zPos));
+            uv.push_back(glm::vec2(xSegment, ySegment));
+            normals.push_back(glm::vec3(xPos, yPos, zPos));
+        }
+    }
+    bool oddRow = false;
+    for(unsigned int y=0; y<Y_SEGMENTS; y++){
+        if(!oddRow){
+            for(unsigned int x=0; x<=X_SEGMENTS; x++){
+                indices.push_back(y * (X_SEGMENTS + 1) + x);
+                indices.push_back((y + 1) * (X_SEGMENTS + 1) + x);
+            }
+        }
+        else{
+            for(int x=X_SEGMENTS; x>=0; x--){
+                indices.push_back((y + 1) * (X_SEGMENTS + 1) + x);
+                indices.push_back(y * (X_SEGMENTS + 1) + x);
+            }
+        }
+        oddRow = !oddRow;
+    }
+    indexCount = static_cast<unsigned int>(indices.size());
+    std::vector<float> sphereVertices;
+    for(unsigned int i=0; i<positions.size(); i++){
+        sphereVertices.push_back(positions[i].x);
+        sphereVertices.push_back(positions[i].y);
+        sphereVertices.push_back(positions[i].z);
+        if(uv.size() > 0){
+            sphereVertices.push_back(uv[i].x);
+            sphereVertices.push_back(uv[i].y);
+        }
+        if(normals.size() > 0){
+            sphereVertices.push_back(normals[i].x);
+            sphereVertices.push_back(normals[i].y);
+            sphereVertices.push_back(normals[i].z);
+        }
+    }
+    unsigned int sphereVAO, sphereVBO, sphereEBO;
+    glGenVertexArrays(1, &sphereVAO);
+    glGenBuffers(1, &sphereVBO);
+    glGenBuffers(1, &sphereEBO);
+    glBindVertexArray(sphereVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, sphereVBO);
+    glBufferData(GL_ARRAY_BUFFER, sphereVertices.size() * sizeof(float), &sphereVertices[0], GL_STATIC_DRAW);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, sphereEBO);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(float), &indices[0], GL_STATIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
+    glEnableVertexAttribArray(2);
+    glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(5 * sizeof(float)));
+
     unsigned int shaderProgram = createShader(vertexShaderSource, fragmentShaderSource);
 
     float skyVertices[] = {       
@@ -491,7 +558,8 @@ int main()
 
         glUniform3fv(glGetUniformLocation(shaderProgram, "camPos"), 1, &camPos[0]);
 
-        glBindVertexArray(VAO);
+        //glBindVertexArray(VAO);
+        glBindVertexArray(sphereVAO);
 
         glm::mat4 model = glm::mat4(1.0f);
         glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "model"), 1, GL_FALSE, &model[0][0]);
@@ -526,7 +594,8 @@ int main()
         glUniform1i(glGetUniformLocation(shaderProgram, "aoMap"), 8);
 
 
-        glDrawArrays(GL_TRIANGLES, 0, 36);
+        //glDrawArrays(GL_TRIANGLES, 0, 36);
+        glDrawElements(GL_TRIANGLE_STRIP, indexCount, GL_UNSIGNED_INT, 0);
         glBindVertexArray(0);
 
 

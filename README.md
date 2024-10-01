@@ -77,7 +77,7 @@ A 3D desktop application to preview PBR materials made using OpenGL and C++. Fea
 
 - [x] Camera Movement
 - [x] Cube rendering
-- [ ] Sphere rendering
+- [x] Sphere rendering
 - [x] HDRI background
 - [ ] UI
 - [x] Ambient IBL
@@ -98,6 +98,7 @@ Distributed under the MIT License. See `LICENSE.txt` for more information.
 ## Acknowledgments
 
 * [Best README Template](https://github.com/othneildrew/Best-README-Template)
+* [Learn OpenGL](https://learnopengl.com/)
 
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
