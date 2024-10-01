@@ -266,6 +266,8 @@ char irradianceFragmentLoc[] = "./src/shaders/irradiance.frag";
 char prefilterFragmentLoc[] = "./src/shaders/prefilter.frag";
 char brdfFragmentLoc[] = "./src/shaders/brdf.frag";
 char brdfVertexLoc[] = "./src/shaders/brdf.vert";
+char uiVertexLoc[] = "./src/shaders/ui.vert";
+char uiFragmentLoc[] = "./src/shaders/ui.frag";
 const char* vertexShaderSource = getShaders(vertexLoc);
 const char* fragmentShaderSource = getShaders(fragmentLoc);
 const char* skyFragmentShaderSource = getShaders(skyFragmentLoc);
@@ -275,6 +277,8 @@ const char* irradianceFragmentShaderSource = getShaders(irradianceFragmentLoc);
 const char* prefilterFragmentShaderSource = getShaders(prefilterFragmentLoc);
 const char* brdfFragmentShaderSource = getShaders(brdfFragmentLoc);
 const char* brdfVertexShaderSource = getShaders(brdfVertexLoc);
+const char* uiVertexShaderSource = getShaders(uiVertexLoc);
+const char* uiFragmentShaderSource = getShaders(uiFragmentLoc);
 char albedoLoc[] = "./src/material/albedo.png";
 char aoLoc[] = "./src/material/ao.png";
 char metallicLoc[] = "./src/material/metallic.png";
@@ -536,6 +540,28 @@ int main()
     unsigned int roughness = loadTexture(roughnessLoc);
     unsigned int ao = loadTexture(aoLoc);
 
+    unsigned int spriteVBO, spriteVAO;
+    float spriteVertices[] = {
+        //vertex position,  texture coordinate
+        0.0f, 1.0f,  0.0f, 1.0f,
+        1.0f, 0.0f,  1.0f, 0.0f,
+        0.0f, 0.0f,  0.0f, 0.0f, 
+        0.0f, 1.0f,  0.0f, 1.0f,
+        1.0f, 1.0f,  1.0f, 1.0f,
+        1.0f, 0.0f,  1.0f, 0.0f
+    };
+    glGenVertexArrays(1, &spriteVAO);
+    glGenBuffers(1, &spriteVBO);
+    glBindBuffer(GL_ARRAY_BUFFER, spriteVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(spriteVertices), spriteVertices, GL_STATIC_DRAW);
+    glBindVertexArray(spriteVAO);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindVertexArray(0);
+    unsigned int spriteProgram = createShader(uiVertexShaderSource, uiFragmentShaderSource);
+
+
     while(!glfwWindowShouldClose(window))
     {
         float currentFrame = static_cast<float>(glfwGetTime());
@@ -612,6 +638,13 @@ int main()
         glBindVertexArray(0);
         glDepthRange(0.0f, 1.0f);  
         glDepthFunc(GL_LESS);
+
+        glm::mat4 orthoProj = glm::ortho(0.0f, 800.0f, 600.0f, 0.0f, -1.0f, 1.0f);
+        glm::mat4 spriteModel = glm::mat4(1.0f);
+        glUseProgram(spriteProgram);
+        model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f));
+        
+
 
         glfwSwapBuffers(window);
         glfwPollEvents();    
