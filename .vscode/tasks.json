@@ -14,7 +14,7 @@
                 "${workspaceFolder}/src/glad.c",
                 "-lglfw3dll",
                 "-o",
-                "${workspaceFolder}/materialviewer.exe"
+                "${workspaceFolder}/build/materialviewer.exe"
             ],
             "options": {
                 "cwd": "${workspaceFolder}"
@@ -43,7 +43,7 @@
                 "-ldl",
                 "-lm",
                 "-o",
-                "${workspaceFolder}/materialviewer"
+                "${workspaceFolder}/build/materialviewer"
             ],
             "options": {
                 "cwd": "${workspaceFolder}"

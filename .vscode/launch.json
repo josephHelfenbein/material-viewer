@@ -5,7 +5,7 @@
             "name": "Windows Debug (g++ exe)",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/materialviewer.exe",
+            "program": "${workspaceFolder}/build/materialviewer.exe",
             "args": [], // Add any program arguments here
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
@@ -27,7 +27,7 @@
             "name": "Linux Debug (g++)",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/materialviewer", // Path to your compiled executable
+            "program": "${workspaceFolder}/build/materialviewer", // Path to your compiled executable
             "args": [], // Command line arguments to pass to the program (if any)
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}", // Current working directory
