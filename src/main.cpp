@@ -290,16 +290,19 @@ char environmentLocs[][70] = {
     "./src/environments/snowy_forest/environment.hdr",
     "./src/environments/syferfontein_1d_clear_puresky/environment.hdr"
 };
-int currentEnvironment = 0;
-glm::vec3 extraColors[] = {glm::vec3(1.0f), glm::vec3(1.0f), glm::vec3(1.0f), glm::vec3(1.0f)};
+int currentElement = 0;
+glm::vec3 extraColors[] = {glm::vec3(1.0f), glm::vec3(1.0f), glm::vec3(1.0f), glm::vec3(1.0f), glm::vec3(1.0f), glm::vec3(1.0f)};
 char uiElementLocs[][30] = {
     "./src/ui/hdri_ui1.png",
     "./src/ui/hdri_ui2.png",
     "./src/ui/hdri_ui3.png",
-    "./src/ui/hdri_ui4.png"
+    "./src/ui/hdri_ui4.png",
+    "./src/ui/hdri_ui5.png",
+    "./src/ui/hdri_ui6.png"
 };
 bool highlightingUI = false;
-bool selectingUI = false;
+bool selectingEnv = false;
+bool selectingShape = false;
 
 int main()
 {
@@ -336,47 +339,47 @@ int main()
 
     float vertices[] = {
         // vertex position,  texture coordinate,  normal vector
-        -0.5f, -0.5f, -0.5f,  0.0f, 0.0f,  0.0f, 0.0f, -1.0f,
-         0.5f, -0.5f, -0.5f,  1.0f, 0.0f,  0.0f, 0.0f, -1.0f,
-         0.5f,  0.5f, -0.5f,  1.0f, 1.0f,  0.0f, 0.0f, -1.0f,
-         0.5f,  0.5f, -0.5f,  1.0f, 1.0f,  0.0f, 0.0f, -1.0f,
-        -0.5f,  0.5f, -0.5f,  0.0f, 1.0f,  0.0f, 0.0f, -1.0f,
-        -0.5f, -0.5f, -0.5f,  0.0f, 0.0f,  0.0f, 0.0f, -1.0f,
+        -0.75f, -0.75f, -0.75f,  0.0f, 0.0f,  0.0f, 0.0f, -1.0f,
+         0.75f, -0.75f, -0.75f,  1.0f, 0.0f,  0.0f, 0.0f, -1.0f,
+         0.75f,  0.75f, -0.75f,  1.0f, 1.0f,  0.0f, 0.0f, -1.0f,
+         0.75f,  0.75f, -0.75f,  1.0f, 1.0f,  0.0f, 0.0f, -1.0f,
+        -0.75f,  0.75f, -0.75f,  0.0f, 1.0f,  0.0f, 0.0f, -1.0f,
+        -0.75f, -0.75f, -0.75f,  0.0f, 0.0f,  0.0f, 0.0f, -1.0f,
 
-        -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,  0.0f, 0.0f, 1.0f,
-         0.5f, -0.5f,  0.5f,  1.0f, 0.0f,  0.0f, 0.0f, 1.0f,
-         0.5f,  0.5f,  0.5f,  1.0f, 1.0f,  0.0f, 0.0f, 1.0f,
-         0.5f,  0.5f,  0.5f,  1.0f, 1.0f,  0.0f, 0.0f, 1.0f,
-        -0.5f,  0.5f,  0.5f,  0.0f, 1.0f,  0.0f, 0.0f, 1.0f,
-        -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,  0.0f, 0.0f, 1.0f,
+        -0.75f, -0.75f,  0.75f,  0.0f, 0.0f,  0.0f, 0.0f, 1.0f,
+         0.75f, -0.75f,  0.75f,  1.0f, 0.0f,  0.0f, 0.0f, 1.0f,
+         0.75f,  0.75f,  0.75f,  1.0f, 1.0f,  0.0f, 0.0f, 1.0f,
+         0.75f,  0.75f,  0.75f,  1.0f, 1.0f,  0.0f, 0.0f, 1.0f,
+        -0.75f,  0.75f,  0.75f,  0.0f, 1.0f,  0.0f, 0.0f, 1.0f,
+        -0.75f, -0.75f,  0.75f,  0.0f, 0.0f,  0.0f, 0.0f, 1.0f,
 
-        -0.5f,  0.5f,  0.5f,  1.0f, 0.0f,  -1.0f, 0.0f, 0.0f,
-        -0.5f,  0.5f, -0.5f,  1.0f, 1.0f,  -1.0f, 0.0f, 0.0f,
-        -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,  -1.0f, 0.0f, 0.0f,
-        -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,  -1.0f, 0.0f, 0.0f,
-        -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,  -1.0f, 0.0f, 0.0f,
-        -0.5f,  0.5f,  0.5f,  1.0f, 0.0f,  -1.0f, 0.0f, 0.0f,
+        -0.75f,  0.75f,  0.75f,  1.0f, 0.0f,  -1.0f, 0.0f, 0.0f,
+        -0.75f,  0.75f, -0.75f,  1.0f, 1.0f,  -1.0f, 0.0f, 0.0f,
+        -0.75f, -0.75f, -0.75f,  0.0f, 1.0f,  -1.0f, 0.0f, 0.0f,
+        -0.75f, -0.75f, -0.75f,  0.0f, 1.0f,  -1.0f, 0.0f, 0.0f,
+        -0.75f, -0.75f,  0.75f,  0.0f, 0.0f,  -1.0f, 0.0f, 0.0f,
+        -0.75f,  0.75f,  0.75f,  1.0f, 0.0f,  -1.0f, 0.0f, 0.0f,
 
-         0.5f,  0.5f,  0.5f,  1.0f, 0.0f,  1.0f, 0.0f, 0.0f,
-         0.5f,  0.5f, -0.5f,  1.0f, 1.0f,  1.0f, 0.0f, 0.0f,
-         0.5f, -0.5f, -0.5f,  0.0f, 1.0f,  1.0f, 0.0f, 0.0f,
-         0.5f, -0.5f, -0.5f,  0.0f, 1.0f,  1.0f, 0.0f, 0.0f,
-         0.5f, -0.5f,  0.5f,  0.0f, 0.0f,  1.0f, 0.0f, 0.0f,
-         0.5f,  0.5f,  0.5f,  1.0f, 0.0f,  1.0f, 0.0f, 0.0f,
+         0.75f,  0.75f,  0.75f,  1.0f, 0.0f,  1.0f, 0.0f, 0.0f,
+         0.75f,  0.75f, -0.75f,  1.0f, 1.0f,  1.0f, 0.0f, 0.0f,
+         0.75f, -0.75f, -0.75f,  0.0f, 1.0f,  1.0f, 0.0f, 0.0f,
+         0.75f, -0.75f, -0.75f,  0.0f, 1.0f,  1.0f, 0.0f, 0.0f,
+         0.75f, -0.75f,  0.75f,  0.0f, 0.0f,  1.0f, 0.0f, 0.0f,
+         0.75f,  0.75f,  0.75f,  1.0f, 0.0f,  1.0f, 0.0f, 0.0f,
 
-        -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,  0.0f, -1.0f, 0.0f,
-         0.5f, -0.5f, -0.5f,  1.0f, 1.0f,  0.0f, -1.0f, 0.0f,
-         0.5f, -0.5f,  0.5f,  1.0f, 0.0f,  0.0f, -1.0f, 0.0f,
-         0.5f, -0.5f,  0.5f,  1.0f, 0.0f,  0.0f, -1.0f, 0.0f,
-        -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,  0.0f, -1.0f, 0.0f,
-        -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,  0.0f, -1.0f, 0.0f,
+        -0.75f, -0.75f, -0.75f,  0.0f, 1.0f,  0.0f, -1.0f, 0.0f,
+         0.75f, -0.75f, -0.75f,  1.0f, 1.0f,  0.0f, -1.0f, 0.0f,
+         0.75f, -0.75f,  0.75f,  1.0f, 0.0f,  0.0f, -1.0f, 0.0f,
+         0.75f, -0.75f,  0.75f,  1.0f, 0.0f,  0.0f, -1.0f, 0.0f,
+        -0.75f, -0.75f,  0.75f,  0.0f, 0.0f,  0.0f, -1.0f, 0.0f,
+        -0.75f, -0.75f, -0.75f,  0.0f, 1.0f,  0.0f, -1.0f, 0.0f,
 
-        -0.5f,  0.5f, -0.5f,  0.0f, 1.0f,  0.0f, 1.0f, 0.0f,
-         0.5f,  0.5f, -0.5f,  1.0f, 1.0f,  0.0f, 1.0f, 0.0f,
-         0.5f,  0.5f,  0.5f,  1.0f, 0.0f,  0.0f, 1.0f, 0.0f,
-         0.5f,  0.5f,  0.5f,  1.0f, 0.0f,  0.0f, 1.0f, 0.0f,
-        -0.5f,  0.5f,  0.5f,  0.0f, 0.0f,  0.0f, 1.0f, 0.0f,
-        -0.5f,  0.5f, -0.5f,  0.0f, 1.0f,  0.0f, 1.0f, 0.0f
+        -0.75f,  0.75f, -0.75f,  0.0f, 1.0f,  0.0f, 1.0f, 0.0f,
+         0.75f,  0.75f, -0.75f,  1.0f, 1.0f,  0.0f, 1.0f, 0.0f,
+         0.75f,  0.75f,  0.75f,  1.0f, 0.0f,  0.0f, 1.0f, 0.0f,
+         0.75f,  0.75f,  0.75f,  1.0f, 0.0f,  0.0f, 1.0f, 0.0f,
+        -0.75f,  0.75f,  0.75f,  0.0f, 0.0f,  0.0f, 1.0f, 0.0f,
+        -0.75f,  0.75f, -0.75f,  0.0f, 1.0f,  0.0f, 1.0f, 0.0f
     };
     unsigned int VBO, VAO;
     glGenVertexArrays(1, &VAO);
@@ -542,7 +545,7 @@ int main()
     glEnableVertexAttribArray(1);
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
 
-    std::pair<std::pair<unsigned int, unsigned int>, std::pair<unsigned int, unsigned int>> envMaps = HDRItoCubemap(environmentLocs[currentEnvironment], cubemapShaderProgram, irradianceShaderProgram, prefilterShaderProgram, brdfShaderProgram, skyVAO, quadVAO);
+    std::pair<std::pair<unsigned int, unsigned int>, std::pair<unsigned int, unsigned int>> envMaps = HDRItoCubemap(environmentLocs[currentElement], cubemapShaderProgram, irradianceShaderProgram, prefilterShaderProgram, brdfShaderProgram, skyVAO, quadVAO);
     unsigned int envCubemap = envMaps.first.first;
     unsigned int irradianceMap = envMaps.first.second;
     unsigned int prefilterMap = envMaps.second.first;
@@ -553,8 +556,8 @@ int main()
     unsigned int normal = loadTexture(normalLoc);
     unsigned int roughness = loadTexture(roughnessLoc);
     unsigned int ao = loadTexture(aoLoc);
-    unsigned int uiElements[4] = {};
-    for(unsigned int i=0; i<4; i++){
+    unsigned int uiElements[sizeof(uiElementLocs)/30] = {};
+    for(unsigned int i=0; i<sizeof(uiElementLocs)/30; i++){
         uiElements[i] = loadTexture(uiElementLocs[i]);
     }
 
@@ -579,6 +582,7 @@ int main()
     glBindVertexArray(0);
     unsigned int spriteProgram = createShader(uiVertexShaderSource, uiFragmentShaderSource);
 
+    bool isCube = false;
 
     while(!glfwWindowShouldClose(window))
     {
@@ -588,12 +592,16 @@ int main()
 
         processInput(window);
 
-        if(selectingUI){
-            selectingUI = false;
-            envMaps = HDRItoCubemap(environmentLocs[currentEnvironment], cubemapShaderProgram, irradianceShaderProgram, prefilterShaderProgram, brdfShaderProgram, skyVAO, quadVAO);
+        if(selectingEnv){
+            selectingEnv = false;
+            envMaps = HDRItoCubemap(environmentLocs[currentElement], cubemapShaderProgram, irradianceShaderProgram, prefilterShaderProgram, brdfShaderProgram, skyVAO, quadVAO);
             envCubemap = envMaps.first.first;
             irradianceMap = envMaps.first.second;
             prefilterMap = envMaps.second.first;
+        }
+        else if(selectingShape){
+            selectingShape = false;
+            isCube = currentElement == 4;
         }
         
         glClearColor(0.1f, 0.1f, 0.2f, 1.0f);
@@ -610,8 +618,10 @@ int main()
 
         glUniform3fv(glGetUniformLocation(shaderProgram, "camPos"), 1, &camPos[0]);
 
-        //glBindVertexArray(VAO);
-        glBindVertexArray(sphereVAO);
+        if(isCube)
+            glBindVertexArray(VAO);
+        else
+            glBindVertexArray(sphereVAO);
 
         glm::mat4 model = glm::mat4(1.0f);
         glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "model"), 1, GL_FALSE, &model[0][0]);
@@ -645,9 +655,10 @@ int main()
         glBindTexture(GL_TEXTURE_2D, ao);
         glUniform1i(glGetUniformLocation(shaderProgram, "aoMap"), 8);
 
-
-        //glDrawArrays(GL_TRIANGLES, 0, 36);
-        glDrawElements(GL_TRIANGLE_STRIP, indexCount, GL_UNSIGNED_INT, 0);
+        if(isCube)
+            glDrawArrays(GL_TRIANGLES, 0, 36);
+        else
+            glDrawElements(GL_TRIANGLE_STRIP, indexCount, GL_UNSIGNED_INT, 0);
         glBindVertexArray(0);
 
         glDepthFunc(GL_LEQUAL); 
@@ -694,6 +705,19 @@ int main()
         glBindTexture(GL_TEXTURE_2D, uiElements[3]);
         glDrawArrays(GL_TRIANGLES, 0, 6);
 
+        spriteModel = glm::mat4(1.0f);
+        spriteModel = glm::translate(spriteModel, glm::vec3((float)SCR_WIDTH - 60.0f, (float)SCR_HEIGHT - 60.0f, 0.0f));
+        spriteModel = glm::scale(spriteModel, glm::vec3(50.0f, 50.0f, 1.0f));
+        glUniformMatrix4fv(glGetUniformLocation(spriteProgram, "model"), 1, GL_FALSE, &spriteModel[0][0]);
+        glUniform3fv(glGetUniformLocation(spriteProgram, "extraColor"), 1, &extraColors[4][0]);
+        glBindTexture(GL_TEXTURE_2D, uiElements[4]);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+        spriteModel = glm::translate(spriteModel, glm::vec3(-1.0f, 0.0f, 0.0f));
+        glUniformMatrix4fv(glGetUniformLocation(spriteProgram, "model"), 1, GL_FALSE, &spriteModel[0][0]);
+        glUniform3fv(glGetUniformLocation(spriteProgram, "extraColor"), 1, &extraColors[5][0]);
+        glBindTexture(GL_TEXTURE_2D, uiElements[5]);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+
         glBindVertexArray(0);
 
 
@@ -717,16 +741,19 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height){
 void processInput(GLFWwindow *window){
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);
-    else if(glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS && highlightingUI)
-        selectingUI = true;
+    else if(glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS && highlightingUI){
+        if(currentElement < 4)
+            selectingEnv = true;
+        else selectingShape = true;
+    }
 }
 void hoverElement(int elementNum){
     for(unsigned int i=0; i<sizeof(extraColors)/12; i++){
         extraColors[i] = glm::vec3(1.0f);
     }
     if(elementNum != -1){
-        extraColors[elementNum] = glm::vec3(1.25f, 1.25f, 1.5f);
-        currentEnvironment = elementNum;
+        extraColors[elementNum] = glm::vec3(1.3f, 1.3f, 1.6f);
+        currentElement = elementNum;
     }
     return;
 }
@@ -740,6 +767,8 @@ void mouseCallback(GLFWwindow* window, double xposIn, double yposIn){
             else if(xposIn > 60.0f && xposIn < 110.0f) {hoverElement(1); highlightingUI = true;}
             else if(xposIn > 110.0f && xposIn < 160.0f) {hoverElement(2); highlightingUI = true;}
             else if(xposIn > 160.0f && xposIn < 210.0f) {hoverElement(3); highlightingUI = true;}
+            else if(xposIn > SCR_WIDTH - 60.0f && xposIn < SCR_WIDTH - 10.0f) {hoverElement(4); highlightingUI = true;}
+            else if(xposIn > SCR_WIDTH - 110.0f && xposIn < SCR_WIDTH - 60.0f) {hoverElement(5); highlightingUI = true;}
             else if(highlightingUI) {hoverElement(-1); highlightingUI = false;}
         }
         else if(highlightingUI) {hoverElement(-1); highlightingUI = false;}

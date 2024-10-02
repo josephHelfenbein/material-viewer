@@ -79,7 +79,7 @@ A 3D desktop application to preview PBR materials made using OpenGL and C++. Fea
 - [x] Cube rendering
 - [x] Sphere rendering
 - [x] HDRI background
-- [ ] UI
+- [x] UI
 - [x] Ambient IBL
 - [x] Specular IBL
 - [ ] Direct IBL
