@@ -291,12 +291,15 @@ char environmentLocs[][70] = {
     "./src/environments/syferfontein_1d_clear_puresky/environment.hdr"
 };
 int currentEnvironment = 0;
+glm::vec3 extraColors[] = {glm::vec3(1.0f), glm::vec3(1.0f), glm::vec3(1.0f), glm::vec3(1.0f)};
 char uiElementLocs[][30] = {
     "./src/ui/hdri_ui1.png",
     "./src/ui/hdri_ui2.png",
     "./src/ui/hdri_ui3.png",
     "./src/ui/hdri_ui4.png"
 };
+bool highlightingUI = false;
+bool selectingUI = false;
 
 int main()
 {
@@ -584,6 +587,16 @@ int main()
         lastFrame = currentFrame;
 
         processInput(window);
+
+        if(selectingUI){
+            selectingUI = false;
+            envMaps = HDRItoCubemap(environmentLocs[currentEnvironment], cubemapShaderProgram, irradianceShaderProgram, prefilterShaderProgram, brdfShaderProgram, skyVAO, quadVAO);
+            envCubemap = envMaps.first.first;
+            irradianceMap = envMaps.first.second;
+            prefilterMap = envMaps.second.first;
+            brdfMap = envMaps.second.second;
+            std::cout<<currentEnvironment;
+        }
         
         glClearColor(0.1f, 0.1f, 0.2f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -639,7 +652,6 @@ int main()
         glDrawElements(GL_TRIANGLE_STRIP, indexCount, GL_UNSIGNED_INT, 0);
         glBindVertexArray(0);
 
-
         glDepthFunc(GL_LEQUAL); 
         glDepthRange(1.0f, 1.0f);
         glUseProgram(skyShaderProgram);
@@ -663,20 +675,24 @@ int main()
         spriteModel = glm::scale(spriteModel, glm::vec3(50.0f, 50.0f, 1.0f));
         glUniformMatrix4fv(glGetUniformLocation(spriteProgram, "model"), 1, GL_FALSE, &spriteModel[0][0]);
         glUniformMatrix4fv(glGetUniformLocation(spriteProgram, "projection"), 1, GL_FALSE, &orthoProj[0][0]);
+        glUniform3fv(glGetUniformLocation(spriteProgram, "extraColor"), 1, &extraColors[0][0]);
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, uiElements[0]);
         glBindVertexArray(spriteVAO);
         glDrawArrays(GL_TRIANGLES, 0, 6);
         spriteModel = glm::translate(spriteModel, glm::vec3(1.0f, 0.0f, 0.0f));
         glUniformMatrix4fv(glGetUniformLocation(spriteProgram, "model"), 1, GL_FALSE, &spriteModel[0][0]);
+        glUniform3fv(glGetUniformLocation(spriteProgram, "extraColor"), 1, &extraColors[1][0]);
         glBindTexture(GL_TEXTURE_2D, uiElements[1]);
         glDrawArrays(GL_TRIANGLES, 0, 6);
         spriteModel = glm::translate(spriteModel, glm::vec3(1.0f, 0.0f, 0.0f));
         glUniformMatrix4fv(glGetUniformLocation(spriteProgram, "model"), 1, GL_FALSE, &spriteModel[0][0]);
+        glUniform3fv(glGetUniformLocation(spriteProgram, "extraColor"), 1, &extraColors[2][0]);
         glBindTexture(GL_TEXTURE_2D, uiElements[2]);
         glDrawArrays(GL_TRIANGLES, 0, 6);
         spriteModel = glm::translate(spriteModel, glm::vec3(1.0f, 0.0f, 0.0f));
         glUniformMatrix4fv(glGetUniformLocation(spriteProgram, "model"), 1, GL_FALSE, &spriteModel[0][0]);
+        glUniform3fv(glGetUniformLocation(spriteProgram, "extraColor"), 1, &extraColors[3][0]);
         glBindTexture(GL_TEXTURE_2D, uiElements[3]);
         glDrawArrays(GL_TRIANGLES, 0, 6);
 
@@ -703,12 +719,32 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height){
 void processInput(GLFWwindow *window){
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);
+    else if(glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS && highlightingUI)
+        selectingUI = true;
+}
+void hoverElement(int elementNum){
+    for(unsigned int i=0; i<sizeof(extraColors)/12; i++){
+        extraColors[i] = glm::vec3(1.0f);
+    }
+    if(elementNum != -1){
+        extraColors[elementNum] = glm::vec3(1.25f, 1.25f, 1.5f);
+        currentEnvironment = elementNum;
+    }
+    return;
 }
 void mouseCallback(GLFWwindow* window, double xposIn, double yposIn){
     if(glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_RELEASE) {
         lastX = xposIn;
         lastY = yposIn;
         firstMouse = true;
+        if(yposIn > SCR_HEIGHT - 60.0f && yposIn < SCR_HEIGHT - 10.0f){
+            if(xposIn > 10.0f && xposIn < 60.0f) {hoverElement(0); highlightingUI = true;}
+            else if(xposIn > 60.0f && xposIn < 110.0f) {hoverElement(1); highlightingUI = true;}
+            else if(xposIn > 110.0f && xposIn < 160.0f) {hoverElement(2); highlightingUI = true;}
+            else if(xposIn > 160.0f && xposIn < 210.0f) {hoverElement(3); highlightingUI = true;}
+            else if(highlightingUI) {hoverElement(-1); highlightingUI = false;}
+        }
+        else if(highlightingUI) {hoverElement(-1); highlightingUI = false;}
         return;
     }
     float xpos = static_cast<float>(xposIn);
