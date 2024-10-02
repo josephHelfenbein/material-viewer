@@ -284,8 +284,19 @@ char aoLoc[] = "./src/material/ao.png";
 char metallicLoc[] = "./src/material/metallic.png";
 char normalLoc[] = "./src/material/normal.png";
 char roughnessLoc[] = "./src/material/roughness.png";
-char environmentLoc[] = "./src/environments/industrial_sunset_puresky/environment.hdr";
-
+char environmentLocs[][70] = {
+    "./src/environments/industrial_sunset_puresky/environment.hdr",
+    "./src/environments/kloppenheim_02_puresky/environment.hdr",
+    "./src/environments/snowy_forest/environment.hdr",
+    "./src/environments/syferfontein_1d_clear_puresky/environment.hdr"
+};
+int currentEnvironment = 0;
+char uiElementLocs[][30] = {
+    "./src/ui/hdri_ui1.png",
+    "./src/ui/hdri_ui2.png",
+    "./src/ui/hdri_ui3.png",
+    "./src/ui/hdri_ui4.png"
+};
 
 int main()
 {
@@ -528,7 +539,7 @@ int main()
     glEnableVertexAttribArray(1);
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
 
-    std::pair<std::pair<unsigned int, unsigned int>, std::pair<unsigned int, unsigned int>> envMaps = HDRItoCubemap(environmentLoc, cubemapShaderProgram, irradianceShaderProgram, prefilterShaderProgram, brdfShaderProgram, skyVAO, quadVAO);
+    std::pair<std::pair<unsigned int, unsigned int>, std::pair<unsigned int, unsigned int>> envMaps = HDRItoCubemap(environmentLocs[currentEnvironment], cubemapShaderProgram, irradianceShaderProgram, prefilterShaderProgram, brdfShaderProgram, skyVAO, quadVAO);
     unsigned int envCubemap = envMaps.first.first;
     unsigned int irradianceMap = envMaps.first.second;
     unsigned int prefilterMap = envMaps.second.first;
@@ -539,6 +550,10 @@ int main()
     unsigned int normal = loadTexture(normalLoc);
     unsigned int roughness = loadTexture(roughnessLoc);
     unsigned int ao = loadTexture(aoLoc);
+    unsigned int uiElements[4] = {};
+    for(unsigned int i=0; i<4; i++){
+        uiElements[i] = loadTexture(uiElementLocs[i]);
+    }
 
     unsigned int spriteVBO, spriteVAO;
     float spriteVertices[] = {
@@ -639,11 +654,33 @@ int main()
         glDepthRange(0.0f, 1.0f);  
         glDepthFunc(GL_LESS);
 
-        glm::mat4 orthoProj = glm::ortho(0.0f, 800.0f, 600.0f, 0.0f, -1.0f, 1.0f);
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        glm::mat4 orthoProj = glm::ortho(0.0f, (float)SCR_WIDTH, (float)SCR_HEIGHT, 0.0f, -1.0f, 1.0f);
         glm::mat4 spriteModel = glm::mat4(1.0f);
         glUseProgram(spriteProgram);
-        model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f));
-        
+        spriteModel = glm::translate(spriteModel, glm::vec3(10.0f, (float)SCR_HEIGHT - 60.0f, 0.0f));
+        spriteModel = glm::scale(spriteModel, glm::vec3(50.0f, 50.0f, 1.0f));
+        glUniformMatrix4fv(glGetUniformLocation(spriteProgram, "model"), 1, GL_FALSE, &spriteModel[0][0]);
+        glUniformMatrix4fv(glGetUniformLocation(spriteProgram, "projection"), 1, GL_FALSE, &orthoProj[0][0]);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, uiElements[0]);
+        glBindVertexArray(spriteVAO);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+        spriteModel = glm::translate(spriteModel, glm::vec3(1.0f, 0.0f, 0.0f));
+        glUniformMatrix4fv(glGetUniformLocation(spriteProgram, "model"), 1, GL_FALSE, &spriteModel[0][0]);
+        glBindTexture(GL_TEXTURE_2D, uiElements[1]);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+        spriteModel = glm::translate(spriteModel, glm::vec3(1.0f, 0.0f, 0.0f));
+        glUniformMatrix4fv(glGetUniformLocation(spriteProgram, "model"), 1, GL_FALSE, &spriteModel[0][0]);
+        glBindTexture(GL_TEXTURE_2D, uiElements[2]);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+        spriteModel = glm::translate(spriteModel, glm::vec3(1.0f, 0.0f, 0.0f));
+        glUniformMatrix4fv(glGetUniformLocation(spriteProgram, "model"), 1, GL_FALSE, &spriteModel[0][0]);
+        glBindTexture(GL_TEXTURE_2D, uiElements[3]);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+
+        glBindVertexArray(0);
 
 
         glfwSwapBuffers(window);
