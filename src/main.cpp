@@ -8,6 +8,39 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 
+#if defined(_WIN32) || defined(__CYGWIN__)
+#include <windows.h>
+#include <commdlg.h>
+char* OpenFileDialog(){
+    char filePath[256] = "";
+    OPENFILENAME ofn;
+    ZeroMemory(&ofn, sizeof(ofn));
+    ofn.lStructSize = sizeof(ofn);
+    ofn.hwndOwner = nullptr;
+    ofn.lpstrFile = filePath;
+    ofn.nMaxFile = sizeof(filePath);
+    ofn.lpstrFilter = "All Files\0*.*\0Text Files\0*.TXT\0";
+    ofn.nFilterIndex = 1;
+    ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST;
+    if(GetOpenFileName(&ofn)) return filePath;
+    else return "";
+}
+#else
+#include <gtk/gtk.h>
+char* OpenFileDialog(){
+    gtk_init(0, nullptr);
+    GtkWidget *dialog = gtk_file_chooser_dialog_new("Open File", nullptr, GTK_FILE_CHOOSER_ACTION_OPEN, "_Cancel", GTK_RESPONSE_CANCEL, "_Open", GTK_RESPONSE_ACCEPT, nullptr);
+    if(gtk_dialog_run(GTK_DIALOG(dialog)) == GTK_RESPONSE_ACCEPT){
+        GtkFileChooser *chooser = GTK_FILE_CHOOSER(dialog);
+        char filePath[256] = gtk_file_chooser_get_filename(chooser);
+        return filePath;
+    }
+    else return "";
+}
+
+
+#endif
+
 unsigned int SCR_WIDTH=800;
 unsigned int SCR_HEIGHT=600;
 const float pi = 3.14159265359;
@@ -291,14 +324,15 @@ char environmentLocs[][70] = {
     "./src/environments/syferfontein_1d_clear_puresky/environment.hdr"
 };
 int currentElement = 0;
-glm::vec3 extraColors[] = {glm::vec3(1.0f), glm::vec3(1.0f), glm::vec3(1.0f), glm::vec3(1.0f), glm::vec3(1.0f), glm::vec3(1.0f)};
+glm::vec3 extraColors[] = {glm::vec3(1.0f), glm::vec3(1.0f), glm::vec3(1.0f), glm::vec3(1.0f), glm::vec3(1.0f), glm::vec3(1.0f), glm::vec3(1.0f)};
 char uiElementLocs[][30] = {
     "./src/ui/hdri_ui1.png",
     "./src/ui/hdri_ui2.png",
     "./src/ui/hdri_ui3.png",
     "./src/ui/hdri_ui4.png",
     "./src/ui/hdri_ui5.png",
-    "./src/ui/hdri_ui6.png"
+    "./src/ui/hdri_ui6.png",
+    "./src/ui/hdri_ui7.png"
 };
 bool highlightingUI = false;
 bool selectingEnv = false;
@@ -704,6 +738,11 @@ int main()
         glUniform3fv(glGetUniformLocation(spriteProgram, "extraColor"), 1, &extraColors[3][0]);
         glBindTexture(GL_TEXTURE_2D, uiElements[3]);
         glDrawArrays(GL_TRIANGLES, 0, 6);
+        spriteModel = glm::translate(spriteModel, glm::vec3(1.0f, 0.0f, 0.0f));
+        glUniformMatrix4fv(glGetUniformLocation(spriteProgram, "model"), 1, GL_FALSE, &spriteModel[0][0]);
+        glUniform3fv(glGetUniformLocation(spriteProgram, "extraColor"), 1, &extraColors[6][0]);
+        glBindTexture(GL_TEXTURE_2D, uiElements[6]);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
 
         spriteModel = glm::mat4(1.0f);
         spriteModel = glm::translate(spriteModel, glm::vec3((float)SCR_WIDTH - 60.0f, (float)SCR_HEIGHT - 60.0f, 0.0f));
@@ -738,13 +777,19 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height){
     SCR_WIDTH = width;
     SCR_HEIGHT = height;
 }
+void uploadHDRI(){
+
+}
 void processInput(GLFWwindow *window){
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);
     else if(glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS && highlightingUI){
         if(currentElement < 4)
             selectingEnv = true;
-        else selectingShape = true;
+        else if(currentElement < 6)
+            selectingShape = true;
+        else if(currentElement == 6)
+            uploadHDRI();
     }
 }
 void hoverElement(int elementNum){
@@ -767,6 +812,7 @@ void mouseCallback(GLFWwindow* window, double xposIn, double yposIn){
             else if(xposIn > 60.0f && xposIn < 110.0f) {hoverElement(1); highlightingUI = true;}
             else if(xposIn > 110.0f && xposIn < 160.0f) {hoverElement(2); highlightingUI = true;}
             else if(xposIn > 160.0f && xposIn < 210.0f) {hoverElement(3); highlightingUI = true;}
+            else if(xposIn > 210.0f && xposIn < 260.0f) {hoverElement(6); highlightingUI = true;}
             else if(xposIn > SCR_WIDTH - 60.0f && xposIn < SCR_WIDTH - 10.0f) {hoverElement(4); highlightingUI = true;}
             else if(xposIn > SCR_WIDTH - 110.0f && xposIn < SCR_WIDTH - 60.0f) {hoverElement(5); highlightingUI = true;}
             else if(highlightingUI) {hoverElement(-1); highlightingUI = false;}
