@@ -10,7 +10,7 @@
 
 #if defined(_WIN32) || defined(__CYGWIN__)
 #include <windows.h>
-#include <commdlg.h>
+#include <commdlg.h>/*
 char* OpenFileDialog(){
     char filePath[256] = "";
     OPENFILENAME ofn;
@@ -24,7 +24,7 @@ char* OpenFileDialog(){
     ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST;
     if(GetOpenFileName(&ofn)) return filePath;
     else return "";
-}
+}*/
 #else
 #include <gtk/gtk.h>
 char* OpenFileDialog(){
