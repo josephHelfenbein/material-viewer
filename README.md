@@ -83,7 +83,7 @@ A 3D desktop application to preview PBR materials made using OpenGL and C++. Fea
 - [x] Diffuse IBL
 - [x] Specular IBL
 - [x] Upload HDRI
-- [ ] Material from images
+- [x] Material from images
 - [ ] Material from zip
 - [ ] Material from file
 
