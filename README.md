@@ -86,6 +86,7 @@ A 3D desktop application to preview PBR materials made using OpenGL and C++. Fea
 - [x] Material from images
 - [ ] Material from zip
 - [ ] Material from file
+- [ ] Save to material file
 
 See the [open issues](https://github.com/josephHelfenbein/material-viewer/issues) for a full list of proposed features (and known issues).
 
