@@ -13,6 +13,7 @@
                 "${workspaceFolder}/src/main.cpp",
                 "${workspaceFolder}/src/glad.c",
                 "-lglfw3dll",
+                "-lcomdlg32",
                 "-o",
                 "${workspaceFolder}/build/materialviewer.exe"
             ],

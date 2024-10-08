@@ -10,21 +10,33 @@
 
 #if defined(_WIN32) || defined(__CYGWIN__)
 #include <windows.h>
-#include <commdlg.h>/*
+#include <commdlg.h>
+#include <direct.h>
 char* OpenFileDialog(){
-    char filePath[256] = "";
-    OPENFILENAME ofn;
+    static char filePath[256];
+    char currentDir[256];
+    _getcwd(currentDir, sizeof(currentDir));
+    OPENFILENAMEA ofn;
     ZeroMemory(&ofn, sizeof(ofn));
     ofn.lStructSize = sizeof(ofn);
     ofn.hwndOwner = nullptr;
     ofn.lpstrFile = filePath;
+    ofn.lpstrFile[0] = '\0';
     ofn.nMaxFile = sizeof(filePath);
-    ofn.lpstrFilter = "All Files\0*.*\0Text Files\0*.TXT\0";
+    ofn.lpstrFilter = "HDR Files\0*.hdr\0""All Image Files\0*.hdr;*.png;*.jpg;*.jpeg;*.bmp\0";
     ofn.nFilterIndex = 1;
+    ofn.lpstrFileTitle = NULL;
+    ofn.nMaxFileTitle = 0;
     ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST;
-    if(GetOpenFileName(&ofn)) return filePath;
-    else return "";
-}*/
+    if(GetOpenFileNameA(&ofn)) {
+        _chdir(currentDir);
+        return filePath;
+    }
+    else {
+        _chdir(currentDir);
+        return nullptr;
+    }
+}
 #else
 #include <gtk/gtk.h>
 char* OpenFileDialog(){
@@ -337,6 +349,8 @@ char uiElementLocs[][30] = {
 bool highlightingUI = false;
 bool selectingEnv = false;
 bool selectingShape = false;
+bool uploadingEnv = false;
+char* uploadedEnv = nullptr;
 
 int main()
 {
@@ -637,6 +651,13 @@ int main()
             selectingShape = false;
             isCube = currentElement == 4;
         }
+        else if(uploadingEnv){
+            uploadingEnv = false;
+            envMaps = HDRItoCubemap(uploadedEnv, cubemapShaderProgram, irradianceShaderProgram, prefilterShaderProgram, brdfShaderProgram, skyVAO, quadVAO);
+            envCubemap = envMaps.first.first;
+            irradianceMap = envMaps.first.second;
+            prefilterMap = envMaps.second.first;
+        }
         
         glClearColor(0.1f, 0.1f, 0.2f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -778,7 +799,11 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height){
     SCR_HEIGHT = height;
 }
 void uploadHDRI(){
-
+    char* newEnvironment = OpenFileDialog();
+    if(newEnvironment) {
+        uploadedEnv = newEnvironment;
+        uploadingEnv = true;
+    }
 }
 void processInput(GLFWwindow *window){
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
