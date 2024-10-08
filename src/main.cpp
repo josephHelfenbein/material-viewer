@@ -36,6 +36,30 @@ char* OpenFileDialog(){
         _chdir(currentDir);
         return nullptr;
     }
+}char* OpenFileDialogTex(){
+    static char filePath[256];
+    char currentDir[256];
+    _getcwd(currentDir, sizeof(currentDir));
+    OPENFILENAMEA ofn;
+    ZeroMemory(&ofn, sizeof(ofn));
+    ofn.lStructSize = sizeof(ofn);
+    ofn.hwndOwner = nullptr;
+    ofn.lpstrFile = filePath;
+    ofn.lpstrFile[0] = '\0';
+    ofn.nMaxFile = sizeof(filePath);
+    ofn.lpstrFilter = "All Image Files\0*.png;*.jpg;*.jpeg;*.bmp\0";
+    ofn.nFilterIndex = 1;
+    ofn.lpstrFileTitle = NULL;
+    ofn.nMaxFileTitle = 0;
+    ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST;
+    if(GetOpenFileNameA(&ofn)) {
+        _chdir(currentDir);
+        return filePath;
+    }
+    else {
+        _chdir(currentDir);
+        return nullptr;
+    }
 }
 #else
 #include <QFileDialog>
@@ -48,6 +72,19 @@ char* OpenFileDialog(){
     QApplication app(argc, argv);
     QApplication::setApplicationName("Material Viewer");
     QString filename = QFileDialog::getOpenFileName(nullptr, "Open File", "", "HDR Files (*.hdr);;All Image Files (*.hdr *.png *.jpg *.jpeg *.bmp)");
+    if(!filename.isEmpty()){
+        snprintf(filePath, sizeof(filePath), "%s", filename.toStdString().c_str());
+        return filePath;
+    }
+    else return nullptr;
+}
+char* OpenFileDialogTex(){
+    static char filePath[256];
+    int argc = 0;
+    char* argv[] = {nullptr};
+    QApplication app(argc, argv);
+    QApplication::setApplicationName("Material Viewer");
+    QString filename = QFileDialog::getOpenFileName(nullptr, "Open File", "", "All Image Files (*.png *.jpg *.jpeg *.bmp)");
     if(!filename.isEmpty()){
         snprintf(filePath, sizeof(filePath), "%s", filename.toStdString().c_str());
         return filePath;
@@ -339,7 +376,7 @@ char environmentLocs[][70] = {
     "./src/environments/syferfontein_1d_clear_puresky/environment.hdr"
 };
 int currentElement = 0;
-glm::vec3 extraColors[] = {glm::vec3(1.0f), glm::vec3(1.0f), glm::vec3(1.0f), glm::vec3(1.0f), glm::vec3(1.0f), glm::vec3(1.0f), glm::vec3(1.0f)};
+glm::vec3 extraColors[14];
 char uiElementLocs[][30] = {
     "./src/ui/hdri_ui1.png",
     "./src/ui/hdri_ui2.png",
@@ -347,16 +384,24 @@ char uiElementLocs[][30] = {
     "./src/ui/hdri_ui4.png",
     "./src/ui/hdri_ui5.png",
     "./src/ui/hdri_ui6.png",
-    "./src/ui/hdri_ui7.png"
+    "./src/ui/hdri_ui7.png",
+    "./src/ui/hdri_ui8.png",
+    "./src/ui/hdri_ui9.png"
 };
 bool highlightingUI = false;
 bool selectingEnv = false;
 bool selectingShape = false;
 bool uploadingEnv = false;
 char* uploadedEnv = nullptr;
+bool showMaterialUI = false;
+unsigned int albedo;
+unsigned int metallic;
+unsigned int normal;
+unsigned int roughness;
+unsigned int ao;
 
 int main()
-{
+{   
     if (!glfwInit())
     {
         std::cout << "Failed to initialize GLFW" << std::endl;
@@ -602,11 +647,14 @@ int main()
     unsigned int prefilterMap = envMaps.second.first;
     unsigned int brdfMap = envMaps.second.second;
 
-    unsigned int albedo = loadTexture(albedoLoc);
-    unsigned int metallic = loadTexture(metallicLoc);
-    unsigned int normal = loadTexture(normalLoc);
-    unsigned int roughness = loadTexture(roughnessLoc);
-    unsigned int ao = loadTexture(aoLoc);
+    albedo = loadTexture(albedoLoc);
+    metallic = loadTexture(metallicLoc);
+    normal = loadTexture(normalLoc);
+    roughness = loadTexture(roughnessLoc);
+    ao = loadTexture(aoLoc);
+    for(unsigned int i=0; i<sizeof(extraColors) / 12; i++){
+        extraColors[i] = glm::vec3(1.0f);
+    }
     unsigned int uiElements[sizeof(uiElementLocs)/30] = {};
     for(unsigned int i=0; i<sizeof(uiElementLocs)/30; i++){
         uiElements[i] = loadTexture(uiElementLocs[i]);
@@ -780,6 +828,55 @@ int main()
         glUniform3fv(glGetUniformLocation(spriteProgram, "extraColor"), 1, &extraColors[5][0]);
         glBindTexture(GL_TEXTURE_2D, uiElements[5]);
         glDrawArrays(GL_TRIANGLES, 0, 6);
+        spriteModel = glm::translate(spriteModel, glm::vec3(-1.0f, 0.0f, 0.0f));
+        glUniformMatrix4fv(glGetUniformLocation(spriteProgram, "model"), 1, GL_FALSE, &spriteModel[0][0]);
+        glUniform3fv(glGetUniformLocation(spriteProgram, "extraColor"), 1, &extraColors[7][0]);
+        glBindTexture(GL_TEXTURE_2D, uiElements[7]);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+
+        if(showMaterialUI){
+            spriteModel = glm::mat4(1.0f);
+            spriteModel = glm::translate(spriteModel, glm::vec3((float)SCR_WIDTH / 4.0f + 20.0f, (float)SCR_HEIGHT / 4.0f + 20.0f, 0.0f));
+            spriteModel = glm::scale(spriteModel, glm::vec3(50.0f, 50.0f, 1.0f));
+            glUniformMatrix4fv(glGetUniformLocation(spriteProgram, "model"), 1, GL_FALSE, &spriteModel[0][0]);
+            glUniform3fv(glGetUniformLocation(spriteProgram, "extraColor"), 1, &extraColors[9][0]);
+            glBindTexture(GL_TEXTURE_2D, albedo);
+            glDrawArrays(GL_TRIANGLES, 0, 6);
+            spriteModel = glm::translate(spriteModel, glm::vec3(0.0f, 1.2f, 0.0f));
+            glUniformMatrix4fv(glGetUniformLocation(spriteProgram, "model"), 1, GL_FALSE, &spriteModel[0][0]);
+            glUniform3fv(glGetUniformLocation(spriteProgram, "extraColor"), 1, &extraColors[10][0]);
+            glBindTexture(GL_TEXTURE_2D, metallic);
+            glDrawArrays(GL_TRIANGLES, 0, 6);
+            spriteModel = glm::translate(spriteModel, glm::vec3(0.0f, 1.2f, 0.0f));
+            glUniformMatrix4fv(glGetUniformLocation(spriteProgram, "model"), 1, GL_FALSE, &spriteModel[0][0]);
+            glUniform3fv(glGetUniformLocation(spriteProgram, "extraColor"), 1, &extraColors[11][0]);
+            glBindTexture(GL_TEXTURE_2D, normal);
+            glDrawArrays(GL_TRIANGLES, 0, 6);
+            spriteModel = glm::translate(spriteModel, glm::vec3(0.0f, 1.2f, 0.0f));
+            glUniformMatrix4fv(glGetUniformLocation(spriteProgram, "model"), 1, GL_FALSE, &spriteModel[0][0]);
+            glUniform3fv(glGetUniformLocation(spriteProgram, "extraColor"), 1, &extraColors[12][0]);
+            glBindTexture(GL_TEXTURE_2D, roughness);
+            glDrawArrays(GL_TRIANGLES, 0, 6);
+            spriteModel = glm::translate(spriteModel, glm::vec3(0.0f, 1.2f, 0.0f));
+            glUniformMatrix4fv(glGetUniformLocation(spriteProgram, "model"), 1, GL_FALSE, &spriteModel[0][0]);
+            glUniform3fv(glGetUniformLocation(spriteProgram, "extraColor"), 1, &extraColors[13][0]);
+            glBindTexture(GL_TEXTURE_2D, ao);
+            glDrawArrays(GL_TRIANGLES, 0, 6);
+            spriteModel = glm::mat4(1.0f);
+            spriteModel = glm::translate(spriteModel, glm::vec3((float)SCR_WIDTH * 2.7f / 4.0f, (float)SCR_HEIGHT / 4.0f + 20.0f, 0.0f));
+            spriteModel = glm::scale(spriteModel, glm::vec3(20.0f, 20.0f, 1.0f));
+            glUniformMatrix4fv(glGetUniformLocation(spriteProgram, "model"), 1, GL_FALSE, &spriteModel[0][0]);
+            glUniform3fv(glGetUniformLocation(spriteProgram, "extraColor"), 1, &extraColors[8][0]);
+            glBindTexture(GL_TEXTURE_2D, uiElements[8]);
+            glDrawArrays(GL_TRIANGLES, 0, 6);
+            spriteModel = glm::mat4(1.0f);
+            spriteModel = glm::translate(spriteModel, glm::vec3((float)SCR_WIDTH / 4.0f, (float)SCR_HEIGHT / 4.0f, 0.0f));
+            spriteModel = glm::scale(spriteModel, glm::vec3((float)SCR_WIDTH / 2.0f, (float)SCR_HEIGHT / 1.8f, 1.0f));
+            glUniformMatrix4fv(glGetUniformLocation(spriteProgram, "model"), 1, GL_FALSE, &spriteModel[0][0]);
+            glUniform3fv(glGetUniformLocation(spriteProgram, "extraColor"), 1, &glm::vec3(1.0f, 1.0f, 1.0f)[0]);
+            glBindTexture(GL_TEXTURE_2D, 0);
+            glDrawArrays(GL_TRIANGLES, 0, 6);
+        }
 
         glBindVertexArray(0);
 
@@ -808,6 +905,15 @@ void uploadHDRI(){
         uploadingEnv = true;
     }
 }
+void uploadTexture(int tex){
+    char* newTexture = OpenFileDialogTex();
+    if(!newTexture) return;
+    if(tex==0) albedo = loadTexture(newTexture);
+    else if(tex==1) metallic = loadTexture(newTexture);
+    else if(tex==2) normal = loadTexture(newTexture);
+    else if(tex==3) roughness = loadTexture(newTexture);
+    else if(tex==4) ao = loadTexture(newTexture);
+}
 void processInput(GLFWwindow *window){
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);
@@ -818,6 +924,12 @@ void processInput(GLFWwindow *window){
             selectingShape = true;
         else if(currentElement == 6)
             uploadHDRI();
+        else if(currentElement == 7)
+            showMaterialUI = true;
+        else if(currentElement == 8)
+            showMaterialUI = false;
+        else if(currentElement < 14)
+            uploadTexture(currentElement - 9);
     }
 }
 void hoverElement(int elementNum){
@@ -835,7 +947,36 @@ void mouseCallback(GLFWwindow* window, double xposIn, double yposIn){
         lastX = xposIn;
         lastY = yposIn;
         firstMouse = true;
-        if(yposIn > SCR_HEIGHT - 60.0f && yposIn < SCR_HEIGHT - 10.0f){
+        if(showMaterialUI){
+            if(yposIn > SCR_HEIGHT / 4.0f + 20.0f && yposIn < SCR_HEIGHT / 4.0f + 40.0f && xposIn > SCR_WIDTH * 2.7f / 4.0f && xposIn < SCR_WIDTH * 2.7f / 4.0f + 20.0f){
+                hoverElement(8);
+                highlightingUI = true;
+            }
+            else if(yposIn > SCR_HEIGHT * 29.0f / 36.0f || yposIn < SCR_HEIGHT / 4.0f || xposIn < SCR_WIDTH / 4.0f || xposIn > SCR_WIDTH * 3.0f / 4.0f){
+                currentElement = 8;
+                highlightingUI = true;
+            }
+            else if(xposIn > SCR_WIDTH / 4.0f + 20.0f && xposIn < SCR_WIDTH / 4.0f + 70.0f){
+                if(yposIn > SCR_HEIGHT / 4.0f + 20.0f && yposIn < SCR_HEIGHT / 4.0f + 70.0f) {
+                    hoverElement(9); highlightingUI = true;
+                }
+                else if(yposIn > SCR_HEIGHT / 4.0f + 80.0f && yposIn < SCR_HEIGHT / 4.0f + 130.0f) {
+                    hoverElement(10); highlightingUI = true;
+                }
+                else if(yposIn > SCR_HEIGHT / 4.0f + 140.0f && yposIn < SCR_HEIGHT / 4.0f + 190.0f) {
+                    hoverElement(11); highlightingUI = true;
+                }
+                else if(yposIn > SCR_HEIGHT / 4.0f + 200.0f && yposIn < SCR_HEIGHT / 4.0f + 250.0f) {
+                    hoverElement(12); highlightingUI = true;
+                }
+                else if(yposIn > SCR_HEIGHT / 4.0f + 260.0f && yposIn < SCR_HEIGHT / 4.0f + 310.0f) {
+                    hoverElement(13); highlightingUI = true;
+                }
+                else if(highlightingUI) {hoverElement(-1); highlightingUI = false;}
+            }
+            else if(highlightingUI) {hoverElement(-1); highlightingUI = false;}
+        }
+        else if(yposIn > SCR_HEIGHT - 60.0f && yposIn < SCR_HEIGHT - 10.0f){
             if(xposIn > 10.0f && xposIn < 60.0f) {hoverElement(0); highlightingUI = true;}
             else if(xposIn > 60.0f && xposIn < 110.0f) {hoverElement(1); highlightingUI = true;}
             else if(xposIn > 110.0f && xposIn < 160.0f) {hoverElement(2); highlightingUI = true;}
@@ -843,6 +984,7 @@ void mouseCallback(GLFWwindow* window, double xposIn, double yposIn){
             else if(xposIn > 210.0f && xposIn < 260.0f) {hoverElement(6); highlightingUI = true;}
             else if(xposIn > SCR_WIDTH - 60.0f && xposIn < SCR_WIDTH - 10.0f) {hoverElement(4); highlightingUI = true;}
             else if(xposIn > SCR_WIDTH - 110.0f && xposIn < SCR_WIDTH - 60.0f) {hoverElement(5); highlightingUI = true;}
+            else if(xposIn > SCR_WIDTH - 160.0f && xposIn < SCR_WIDTH - 110.0f) {hoverElement(7); highlightingUI = true;}
             else if(highlightingUI) {hoverElement(-1); highlightingUI = false;}
         }
         else if(highlightingUI) {hoverElement(-1); highlightingUI = false;}
