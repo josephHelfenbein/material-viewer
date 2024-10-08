@@ -7,6 +7,7 @@
 #include <vector>
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
+#include <zip.h>
 
 #if defined(_WIN32) || defined(__CYGWIN__)
 #include <windows.h>
@@ -92,7 +93,6 @@ char* OpenFileDialogTex(){
     else return nullptr;
 }
 #endif
-
 unsigned int SCR_WIDTH=800;
 unsigned int SCR_HEIGHT=600;
 const float pi = 3.14159265359;
@@ -129,7 +129,7 @@ char* getShaders(char file[]){
 unsigned int loadEnv(char file[]){
     stbi_set_flip_vertically_on_load(true);
     int width, height, nrComponents;
-    float *data = stbi_loadf(file, &width, &height, &nrComponents, 0);
+    float* data = stbi_loadf(file, &width, &height, &nrComponents, 0);
     unsigned int hdrTexture;
     if(data){
         glGenTextures(1, &hdrTexture);
@@ -151,7 +151,7 @@ unsigned int loadTexture(char file[]){
     unsigned int textureID;
     glGenTextures(2, &textureID);
     int width, height, nrComponents;
-    unsigned char *data = stbi_load(file, &width, &height, &nrComponents, 0);
+    unsigned char* data = stbi_load(file, &width, &height, &nrComponents, 0);
     if(data){
         GLenum format;
         if(nrComponents == 1) format = GL_RED;
@@ -171,6 +171,48 @@ unsigned int loadTexture(char file[]){
         stbi_image_free(data);
     }
     return textureID;
+}
+unsigned int* OpenZipFile(char* path){
+    char* filenames[] = {
+        (char*)"albedo.png",
+        (char*)"metallic.png",
+        (char*)"normal.png",
+        (char*)"roughness.png",
+        (char*)"ao.png",
+    };
+    const int numTextures = 5;
+    unsigned int* textures = new unsigned int[numTextures];
+    int err = 0;
+    zip* archive = zip_open(path, 0, &err);
+    if(!archive) {
+        delete[] textures;
+        return nullptr;
+    }
+    for(unsigned int i=0; i<numTextures; i++){
+        zip_file* zfile = zip_fopen(archive, filenames[i], 0);
+        if(!zfile) {
+            zip_close(archive); 
+            delete[] textures;
+            return nullptr;
+        }
+        FILE* output = fopen(filenames[i], "wb");
+        if(!output){
+            zip_fclose(zfile);
+            zip_close(archive);
+            delete[] textures;
+            return nullptr;
+        }
+        char buffer[4096];
+        int bytesRead;
+        while((bytesRead = zip_fread(zfile, buffer, sizeof(buffer))) > 0)
+            fwrite(buffer, 1, bytesRead, output);
+        fclose(output);
+        zip_fclose(zfile);
+        textures[i] = loadTexture(filenames[i]);
+        remove(filenames[i]);
+    }
+    zip_close(archive);
+    return textures;
 }
 unsigned int createShader(const char* vertSource, const char* fragSource){
     unsigned int vertexShader = glCreateShader(GL_VERTEX_SHADER);
@@ -376,7 +418,6 @@ char environmentLocs[][70] = {
     "./src/environments/syferfontein_1d_clear_puresky/environment.hdr"
 };
 int currentElement = 0;
-glm::vec3 extraColors[14];
 char uiElementLocs[][30] = {
     "./src/ui/hdri_ui1.png",
     "./src/ui/hdri_ui2.png",
@@ -392,7 +433,9 @@ char uiElementLocs[][30] = {
     "./src/ui/img_ui12.png",
     "./src/ui/img_ui13.png",
     "./src/ui/img_ui14.png",
+    "./src/ui/img_ui15.png"
 };
+glm::vec3 extraColors[sizeof(uiElementLocs)/30];
 bool highlightingUI = false;
 bool selectingEnv = false;
 bool selectingShape = false;
@@ -688,8 +731,7 @@ int main()
 
     bool isCube = false;
 
-    while(!glfwWindowShouldClose(window))
-    {
+    while(!glfwWindowShouldClose(window)) {
         float currentFrame = static_cast<float>(glfwGetTime());
         deltaTime = currentFrame - lastFrame;
         lastFrame = currentFrame;
@@ -820,7 +862,6 @@ int main()
         glUniform3fv(glGetUniformLocation(spriteProgram, "extraColor"), 1, &extraColors[6][0]);
         glBindTexture(GL_TEXTURE_2D, uiElements[6]);
         glDrawArrays(GL_TRIANGLES, 0, 6);
-
         spriteModel = glm::mat4(1.0f);
         spriteModel = glm::translate(spriteModel, glm::vec3((float)SCR_WIDTH - 60.0f, (float)SCR_HEIGHT - 60.0f, 0.0f));
         spriteModel = glm::scale(spriteModel, glm::vec3(50.0f, 50.0f, 1.0f));
@@ -895,11 +936,17 @@ int main()
             glBindTexture(GL_TEXTURE_2D, uiElements[13]);
             glDrawArrays(GL_TRIANGLES, 0, 6);
             spriteModel = glm::mat4(1.0f);
-            spriteModel = glm::translate(spriteModel, glm::vec3((float)SCR_WIDTH * 2.7f / 4.0f, (float)SCR_HEIGHT / 4.0f + 20.0f, 0.0f));
+            spriteModel = glm::translate(spriteModel, glm::vec3((float)SCR_WIDTH * 3.0f / 4.0f - 30.0f, (float)SCR_HEIGHT / 4.0f + 20.0f, 0.0f));
             spriteModel = glm::scale(spriteModel, glm::vec3(20.0f, 20.0f, 1.0f));
             glUniformMatrix4fv(glGetUniformLocation(spriteProgram, "model"), 1, GL_FALSE, &spriteModel[0][0]);
             glUniform3fv(glGetUniformLocation(spriteProgram, "extraColor"), 1, &extraColors[8][0]);
             glBindTexture(GL_TEXTURE_2D, uiElements[8]);
+            glDrawArrays(GL_TRIANGLES, 0, 6);
+            spriteModel = glm::scale(spriteModel, glm::vec3(2.5f, -2.5f, 1.0f));
+            spriteModel = glm::translate(spriteModel, glm::vec3(-0.6f, -1.5f, 0.0f));
+            glUniformMatrix4fv(glGetUniformLocation(spriteProgram, "model"), 1, GL_FALSE, &spriteModel[0][0]);
+            glUniform3fv(glGetUniformLocation(spriteProgram, "extraColor"), 1, &extraColors[14][0]);
+            glBindTexture(GL_TEXTURE_2D, uiElements[14]);
             glDrawArrays(GL_TRIANGLES, 0, 6);
             spriteModel = glm::mat4(1.0f);
             spriteModel = glm::translate(spriteModel, glm::vec3((float)SCR_WIDTH / 4.0f, (float)SCR_HEIGHT / 4.0f, 0.0f));
@@ -980,7 +1027,7 @@ void mouseCallback(GLFWwindow* window, double xposIn, double yposIn){
         lastY = yposIn;
         firstMouse = true;
         if(showMaterialUI){
-            if(yposIn > SCR_HEIGHT / 4.0f + 20.0f && yposIn < SCR_HEIGHT / 4.0f + 40.0f && xposIn > SCR_WIDTH * 2.7f / 4.0f && xposIn < SCR_WIDTH * 2.7f / 4.0f + 20.0f){
+            if(yposIn > SCR_HEIGHT / 4.0f + 20.0f && yposIn < SCR_HEIGHT / 4.0f + 40.0f && xposIn > SCR_WIDTH * 3.0f / 4.0f - 30.0f && xposIn < SCR_WIDTH * 3.0f / 4.0f - 10.0f){
                 hoverElement(8);
                 highlightingUI = true;
             }
