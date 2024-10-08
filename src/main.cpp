@@ -96,7 +96,7 @@ char* OpenFileDialogTex(){
 unsigned int SCR_WIDTH=800;
 unsigned int SCR_HEIGHT=600;
 const float pi = 3.14159265359;
-float radius = 7.0f;
+float radius = 5.0f;
 float yaw = pi/8;
 float pitch = pi/12;
 glm::vec3 camPos = glm::vec3(sin(yaw)*radius, sin(pitch)*radius, cos(yaw)*radius);
@@ -386,7 +386,12 @@ char uiElementLocs[][30] = {
     "./src/ui/hdri_ui6.png",
     "./src/ui/hdri_ui7.png",
     "./src/ui/hdri_ui8.png",
-    "./src/ui/hdri_ui9.png"
+    "./src/ui/hdri_ui9.png",
+    "./src/ui/img_ui10.png",
+    "./src/ui/img_ui11.png",
+    "./src/ui/img_ui12.png",
+    "./src/ui/img_ui13.png",
+    "./src/ui/img_ui14.png",
 };
 bool highlightingUI = false;
 bool selectingEnv = false;
@@ -861,6 +866,33 @@ int main()
             glUniformMatrix4fv(glGetUniformLocation(spriteProgram, "model"), 1, GL_FALSE, &spriteModel[0][0]);
             glUniform3fv(glGetUniformLocation(spriteProgram, "extraColor"), 1, &extraColors[13][0]);
             glBindTexture(GL_TEXTURE_2D, ao);
+            glDrawArrays(GL_TRIANGLES, 0, 6);
+            spriteModel = glm::mat4(1.0f);
+            spriteModel = glm::translate(spriteModel, glm::vec3((float)SCR_WIDTH / 4.0f + 80.0f, (float)SCR_HEIGHT / 4.0f + 70.0f, 0.0f));
+            spriteModel = glm::scale(spriteModel, glm::vec3(160.0f, -50.0f, 1.0f));
+            glUniformMatrix4fv(glGetUniformLocation(spriteProgram, "model"), 1, GL_FALSE, &spriteModel[0][0]);
+            glUniform3fv(glGetUniformLocation(spriteProgram, "extraColor"), 1, &extraColors[9][0]);
+            glBindTexture(GL_TEXTURE_2D, uiElements[9]);
+            glDrawArrays(GL_TRIANGLES, 0, 6);
+            spriteModel = glm::translate(spriteModel, glm::vec3(0.0f, -1.2f, 0.0f));
+            glUniformMatrix4fv(glGetUniformLocation(spriteProgram, "model"), 1, GL_FALSE, &spriteModel[0][0]);
+            glUniform3fv(glGetUniformLocation(spriteProgram, "extraColor"), 1, &extraColors[10][0]);
+            glBindTexture(GL_TEXTURE_2D, uiElements[10]);
+            glDrawArrays(GL_TRIANGLES, 0, 6);
+            spriteModel = glm::translate(spriteModel, glm::vec3(0.0f, -1.2f, 0.0f));
+            glUniformMatrix4fv(glGetUniformLocation(spriteProgram, "model"), 1, GL_FALSE, &spriteModel[0][0]);
+            glUniform3fv(glGetUniformLocation(spriteProgram, "extraColor"), 1, &extraColors[11][0]);
+            glBindTexture(GL_TEXTURE_2D, uiElements[11]);
+            glDrawArrays(GL_TRIANGLES, 0, 6);
+            spriteModel = glm::translate(spriteModel, glm::vec3(0.0f, -1.2f, 0.0f));
+            glUniformMatrix4fv(glGetUniformLocation(spriteProgram, "model"), 1, GL_FALSE, &spriteModel[0][0]);
+            glUniform3fv(glGetUniformLocation(spriteProgram, "extraColor"), 1, &extraColors[12][0]);
+            glBindTexture(GL_TEXTURE_2D, uiElements[12]);
+            glDrawArrays(GL_TRIANGLES, 0, 6);
+            spriteModel = glm::translate(spriteModel, glm::vec3(0.0f, -1.2f, 0.0f));
+            glUniformMatrix4fv(glGetUniformLocation(spriteProgram, "model"), 1, GL_FALSE, &spriteModel[0][0]);
+            glUniform3fv(glGetUniformLocation(spriteProgram, "extraColor"), 1, &extraColors[13][0]);
+            glBindTexture(GL_TEXTURE_2D, uiElements[13]);
             glDrawArrays(GL_TRIANGLES, 0, 6);
             spriteModel = glm::mat4(1.0f);
             spriteModel = glm::translate(spriteModel, glm::vec3((float)SCR_WIDTH * 2.7f / 4.0f, (float)SCR_HEIGHT / 4.0f + 20.0f, 0.0f));
