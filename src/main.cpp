@@ -38,19 +38,22 @@ char* OpenFileDialog(){
     }
 }
 #else
-#include <gtk/gtk.h>
+#include <QFileDialog>
+#include <QString>
+#include <QApplication>
 char* OpenFileDialog(){
-    gtk_init(0, nullptr);
-    GtkWidget *dialog = gtk_file_chooser_dialog_new("Open File", nullptr, GTK_FILE_CHOOSER_ACTION_OPEN, "_Cancel", GTK_RESPONSE_CANCEL, "_Open", GTK_RESPONSE_ACCEPT, nullptr);
-    if(gtk_dialog_run(GTK_DIALOG(dialog)) == GTK_RESPONSE_ACCEPT){
-        GtkFileChooser *chooser = GTK_FILE_CHOOSER(dialog);
-        char filePath[256] = gtk_file_chooser_get_filename(chooser);
+    static char filePath[256];
+    int argc = 0;
+    char* argv[] = {nullptr};
+    QApplication app(argc, argv);
+    QApplication::setApplicationName("Material Viewer");
+    QString filename = QFileDialog::getOpenFileName(nullptr, "Open File", "", "HDR Files (*.hdr);;All Image Files (*.hdr *.png *.jpg *.jpeg *.bmp)");
+    if(!filename.isEmpty()){
+        snprintf(filePath, sizeof(filePath), "%s", filename.toStdString().c_str());
         return filePath;
     }
-    else return "";
+    else return nullptr;
 }
-
-
 #endif
 
 unsigned int SCR_WIDTH=800;
