@@ -37,7 +37,8 @@ char* OpenFileDialog(){
         _chdir(currentDir);
         return nullptr;
     }
-}char* OpenFileDialogTex(){
+}
+char* OpenFileDialogTex(){
     static char filePath[256];
     char currentDir[256];
     _getcwd(currentDir, sizeof(currentDir));
@@ -49,6 +50,31 @@ char* OpenFileDialog(){
     ofn.lpstrFile[0] = '\0';
     ofn.nMaxFile = sizeof(filePath);
     ofn.lpstrFilter = "All Image Files\0*.png;*.jpg;*.jpeg;*.bmp\0";
+    ofn.nFilterIndex = 1;
+    ofn.lpstrFileTitle = NULL;
+    ofn.nMaxFileTitle = 0;
+    ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST;
+    if(GetOpenFileNameA(&ofn)) {
+        _chdir(currentDir);
+        return filePath;
+    }
+    else {
+        _chdir(currentDir);
+        return nullptr;
+    }
+}
+char* OpenFileDialogZip(){
+    static char filePath[256];
+    char currentDir[256];
+    _getcwd(currentDir, sizeof(currentDir));
+    OPENFILENAMEA ofn;
+    ZeroMemory(&ofn, sizeof(ofn));
+    ofn.lStructSize = sizeof(ofn);
+    ofn.hwndOwner = nullptr;
+    ofn.lpstrFile = filePath;
+    ofn.lpstrFile[0] = '\0';
+    ofn.nMaxFile = sizeof(filePath);
+    ofn.lpstrFilter = "Zip Files (*.zip)\0*.zip\0All Files (*.*)\0*.*\0";
     ofn.nFilterIndex = 1;
     ofn.lpstrFileTitle = NULL;
     ofn.nMaxFileTitle = 0;
@@ -86,6 +112,19 @@ char* OpenFileDialogTex(){
     QApplication app(argc, argv);
     QApplication::setApplicationName("Material Viewer");
     QString filename = QFileDialog::getOpenFileName(nullptr, "Open File", "", "All Image Files (*.png *.jpg *.jpeg *.bmp)");
+    if(!filename.isEmpty()){
+        snprintf(filePath, sizeof(filePath), "%s", filename.toStdString().c_str());
+        return filePath;
+    }
+    else return nullptr;
+}
+char* OpenFileDialogZip(){
+    static char filePath[256];
+    int argc = 0;
+    char* argv[] = {nullptr};
+    QApplication app(argc, argv);
+    QApplication::setApplicationName("Material Viewer");
+    QString filename = QFileDialog::getOpenFileName(nullptr, "Open Zip File", "", "Zip Files (*.zip);;All Files (*.*)");
     if(!filename.isEmpty()){
         snprintf(filePath, sizeof(filePath), "%s", filename.toStdString().c_str());
         return filePath;
@@ -175,32 +214,28 @@ unsigned int loadTexture(char file[]){
 unsigned int* OpenZipFile(char* path){
     char* filenames[] = {
         (char*)"albedo.png",
-        (char*)"metallic.png",
+        (char*)"metalness.png",
         (char*)"normal.png",
         (char*)"roughness.png",
         (char*)"ao.png",
     };
     const int numTextures = 5;
     unsigned int* textures = new unsigned int[numTextures];
+    for(unsigned int i=0; i<numTextures; i++) textures[i] = -1;
     int err = 0;
     zip* archive = zip_open(path, 0, &err);
     if(!archive) {
-        delete[] textures;
-        return nullptr;
+        return textures;
     }
     for(unsigned int i=0; i<numTextures; i++){
         zip_file* zfile = zip_fopen(archive, filenames[i], 0);
         if(!zfile) {
-            zip_close(archive); 
-            delete[] textures;
-            return nullptr;
+            continue;
         }
         FILE* output = fopen(filenames[i], "wb");
         if(!output){
             zip_fclose(zfile);
-            zip_close(archive);
-            delete[] textures;
-            return nullptr;
+            continue;
         }
         char buffer[4096];
         int bytesRead;
@@ -993,6 +1028,23 @@ void uploadTexture(int tex){
     else if(tex==3) roughness = loadTexture(newTexture);
     else if(tex==4) ao = loadTexture(newTexture);
 }
+void uploadZip(){
+    char* newZip = OpenFileDialogZip();
+    if(newZip){
+        unsigned int* textures = OpenZipFile(newZip);
+        if(textures[0] != -1)
+            albedo = textures[0];
+        if(textures[1] != -1)
+            metallic = textures[1];
+        if(textures[2] != -1)
+            normal = textures[2];
+        if(textures[3] != -1)
+            roughness = textures[3];
+        if(textures[4] != -1)
+            ao = textures[4];
+    }
+    else return;
+}
 void processInput(GLFWwindow *window){
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);
@@ -1009,6 +1061,8 @@ void processInput(GLFWwindow *window){
             showMaterialUI = false;
         else if(currentElement < 14)
             uploadTexture(currentElement - 9);
+        else if(currentElement == 14)
+            uploadZip();
     }
 }
 void hoverElement(int elementNum){
@@ -1034,6 +1088,9 @@ void mouseCallback(GLFWwindow* window, double xposIn, double yposIn){
             else if(yposIn > SCR_HEIGHT * 29.0f / 36.0f || yposIn < SCR_HEIGHT / 4.0f || xposIn < SCR_WIDTH / 4.0f || xposIn > SCR_WIDTH * 3.0f / 4.0f){
                 currentElement = 8;
                 highlightingUI = true;
+            }
+            else if(yposIn < SCR_HEIGHT / 4.0f + 95.0f && yposIn > SCR_HEIGHT / 4.0f + 45.0f && xposIn > SCR_WIDTH * 3.0f / 4.0f - 60.0f && xposIn < SCR_WIDTH * 3.0f / 4.0f - 10.0f){
+                hoverElement(14); highlightingUI = true;
             }
             else if(xposIn > SCR_WIDTH / 4.0f + 20.0f && xposIn < SCR_WIDTH / 4.0f + 70.0f){
                 if(yposIn > SCR_HEIGHT / 4.0f + 20.0f && yposIn < SCR_HEIGHT / 4.0f + 70.0f) {
