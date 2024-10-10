@@ -8,6 +8,7 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 #include <zip.h>
+#include <fstream>
 
 #if defined(_WIN32) || defined(__CYGWIN__)
 #include <windows.h>
@@ -88,6 +89,30 @@ char* OpenFileDialogZip(){
         return nullptr;
     }
 }
+char* OpenFileDialogDir(){
+    static char dirPath[256];
+    char currentDir[256];
+    _getcwd(currentDir, sizeof(currentDir));
+    BROWSEINFOA bi;
+    ZeroMemory(&bi, sizeof(bi));
+    bi.lpszTitle = "Select Directory";
+    bi.ulFlags = BIF_RETURNONLYFSDIRS | BIF_NEWDIALOGSTYLE;
+    LPITEMIDLIST pidl = SHBrowseForFolderA(&bi);
+    if(pidl != nullptr){
+        SHGetPathFromIDListA(pidl, dirPath);
+        IMalloc* imalloc = nullptr;
+        if(SUCCEEDED(SHGetMalloc(&imalloc))){
+            imalloc->Free(pidl);
+            imalloc->Release();
+        }
+        _chdir(currentDir);
+        return dirPath;
+    }
+    else{
+        _chdir(currentDir);
+        return nullptr;
+    }
+}
 #else
 #include <QFileDialog>
 #include <QString>
@@ -128,6 +153,19 @@ char* OpenFileDialogZip(){
     if(!filename.isEmpty()){
         snprintf(filePath, sizeof(filePath), "%s", filename.toStdString().c_str());
         return filePath;
+    }
+    else return nullptr;
+}
+char* OpenFileDialogDir(){
+    static char dirPath[256];
+    int argc = 0;
+    char* argv[] = {nullptr};
+    QApplication app(argc, argv);
+    QApplication::setApplicationName("Material Viewer");
+    QString directory = QFileDialog::getExistingDirectory(nullptr, "Select Directory", "", QFileDialog::ShowDirsOnly | QFileDialog::DontResolveSymlinks);
+    if(!directory.isEmpty()){
+        snprintf(dirPath, sizeof(dirPath), "%s", directory.toStdString().c_str());
+        return dirPath;
     }
     else return nullptr;
 }
@@ -417,6 +455,66 @@ std::pair<std::pair<unsigned int, unsigned int>, std::pair<unsigned int, unsigne
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
     return {{envCubemap, irradianceMap}, {prefilterMap, brdfLUTTexture}};
+}
+struct ImageData{
+    unsigned char* data;
+    int width;
+    int height;
+    int channels;
+    int dataSize;
+    ImageData(unsigned char* dataPtr, int w, int h, int ch, int size)
+        : data(dataPtr), width(w), height(h), channels(ch), dataSize(size) {}
+    ~ImageData(){
+        stbi_image_free(data);
+    }
+};
+ImageData* loadImageData(const char* path){
+    int w, h, ch;
+    unsigned char* data = stbi_load(path, &w, &h, &ch, 0);
+    if(!data) {
+        std::cout<<"Failed to load image "<<path<<std::endl;
+        return nullptr;
+    }
+    return new ImageData(data, w, h, ch, w * h * ch);
+}
+struct TextureMetadata{
+    unsigned int width;
+    unsigned int height;
+    unsigned char channels;
+    unsigned int dataSize;
+};
+bool writeCustomTextureFile(const char* outputPath, const char* albedo, const char* roughness, const char* normal, const char* metalness, const char* ao){
+    ImageData* albedoData = loadImageData(albedo);
+    ImageData* roughnessData = loadImageData(roughness);
+    ImageData* normalData = loadImageData(normal);
+    ImageData* metalnessData = loadImageData(metalness);
+    ImageData* aoData = loadImageData(ao);
+    if(!albedoData || !roughnessData || !normalData || !metalnessData || !aoData) return;
+    TextureMetadata albedoMeta = {albedoData->width, albedoData->height, albedoData->channels, static_cast<unsigned int>(albedoData->dataSize)};
+    TextureMetadata roughnessMeta = {roughnessData->width, roughnessData->height, roughnessData->channels, static_cast<unsigned int>(roughnessData->dataSize)};
+    TextureMetadata normalMeta = {normalData->width, normalData->height, normalData->channels, static_cast<unsigned int>(normalData->dataSize)};
+    TextureMetadata metalnessMeta = {metalnessData->width, metalnessData->height, metalnessData->channels, static_cast<unsigned int>(metalnessData->dataSize)};
+    TextureMetadata aoMeta = {aoData->width, aoData->height, aoData->channels, static_cast<unsigned int>(aoData->dataSize)};
+    std::ofstream outputFile(outputPath, std::ios::binary);
+    if(!outputFile.is_open()){
+        std::cout<<"Failed to open output file "<<outputPath<<std::endl;
+        return false;
+    }
+    unsigned int magicNumber = 0x54455854;
+    outputFile.write(reinterpret_cast<const char*>(&magicNumber), sizeof(magicNumber));
+    outputFile.write(reinterpret_cast<const char*>(&albedoMeta), sizeof(albedoMeta));
+    outputFile.write(reinterpret_cast<const char*>(&roughnessMeta), sizeof(roughnessMeta));
+    outputFile.write(reinterpret_cast<const char*>(&normalMeta), sizeof(normalMeta));
+    outputFile.write(reinterpret_cast<const char*>(&metalnessMeta), sizeof(metalnessMeta));
+    outputFile.write(reinterpret_cast<const char*>(&aoMeta), sizeof(aoMeta));
+    outputFile.write(reinterpret_cast<const char*>(albedoData->data), albedoMeta.dataSize);
+    outputFile.write(reinterpret_cast<const char*>(roughnessData->data), roughnessMeta.dataSize);
+    outputFile.write(reinterpret_cast<const char*>(normalData->data), normalMeta.dataSize);
+    outputFile.write(reinterpret_cast<const char*>(metalnessData->data), metalnessMeta.dataSize);
+    outputFile.write(reinterpret_cast<const char*>(aoData->data), aoMeta.dataSize);
+    outputFile.close();
+    std::cout<<"Custom texture file written to "<<outputPath<<std::endl;
+    return true;
 }
 
 char vertexLoc[] = "./src/shaders/main.vert";
@@ -1052,7 +1150,7 @@ void uploadZip(){
     else return;
 }
 void saveToFile(){
-    
+
 }
 void processInput(GLFWwindow *window){
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
