@@ -468,7 +468,8 @@ char uiElementLocs[][30] = {
     "./src/ui/img_ui12.png",
     "./src/ui/img_ui13.png",
     "./src/ui/img_ui14.png",
-    "./src/ui/img_ui15.png"
+    "./src/ui/img_ui15.png",
+    "./src/ui/img_ui16.png"
 };
 glm::vec3 extraColors[sizeof(uiElementLocs)/30];
 bool highlightingUI = false;
@@ -983,6 +984,11 @@ int main()
             glUniform3fv(glGetUniformLocation(spriteProgram, "extraColor"), 1, &extraColors[14][0]);
             glBindTexture(GL_TEXTURE_2D, uiElements[14]);
             glDrawArrays(GL_TRIANGLES, 0, 6);
+            spriteModel = glm::translate(spriteModel, glm::vec3(0.0f, -1.1f, 0.0f));
+            glUniformMatrix4fv(glGetUniformLocation(spriteProgram, "model"), 1, GL_FALSE, &spriteModel[0][0]);
+            glUniform3fv(glGetUniformLocation(spriteProgram, "extraColor"), 1, &extraColors[15][0]);
+            glBindTexture(GL_TEXTURE_2D, uiElements[15]);
+            glDrawArrays(GL_TRIANGLES, 0, 6);
             spriteModel = glm::mat4(1.0f);
             spriteModel = glm::translate(spriteModel, glm::vec3((float)SCR_WIDTH / 4.0f, (float)SCR_HEIGHT / 4.0f, 0.0f));
             spriteModel = glm::scale(spriteModel, glm::vec3((float)SCR_WIDTH / 2.0f, (float)SCR_HEIGHT / 1.8f, 1.0f));
@@ -1045,6 +1051,9 @@ void uploadZip(){
     }
     else return;
 }
+void saveToFile(){
+    
+}
 void processInput(GLFWwindow *window){
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);
@@ -1063,6 +1072,8 @@ void processInput(GLFWwindow *window){
             uploadTexture(currentElement - 9);
         else if(currentElement == 14)
             uploadZip();
+        else if(currentElement == 15)
+            saveToFile();
     }
 }
 void hoverElement(int elementNum){
@@ -1091,6 +1102,9 @@ void mouseCallback(GLFWwindow* window, double xposIn, double yposIn){
             }
             else if(yposIn < SCR_HEIGHT / 4.0f + 95.0f && yposIn > SCR_HEIGHT / 4.0f + 45.0f && xposIn > SCR_WIDTH * 3.0f / 4.0f - 60.0f && xposIn < SCR_WIDTH * 3.0f / 4.0f - 10.0f){
                 hoverElement(14); highlightingUI = true;
+            }
+            else if(yposIn < SCR_HEIGHT / 4.0f + 150.0f && yposIn > SCR_HEIGHT / 4.0f + 100.0f && xposIn > SCR_WIDTH * 3.0f / 4.0f - 60.0f && xposIn < SCR_WIDTH * 3.0f / 4.0f - 10.0f){
+                hoverElement(15); highlightingUI = true;
             }
             else if(xposIn > SCR_WIDTH / 4.0f + 20.0f && xposIn < SCR_WIDTH / 4.0f + 70.0f){
                 if(yposIn > SCR_HEIGHT / 4.0f + 20.0f && yposIn < SCR_HEIGHT / 4.0f + 70.0f) {
