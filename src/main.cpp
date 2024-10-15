@@ -255,6 +255,30 @@ unsigned int loadTexture(char file[]){
     }
     return textureID;
 }
+struct ImageData{
+    unsigned char* data;
+    int width;
+    int height;
+    int channels;
+    size_t dataSize;
+};
+unsigned int loadTexture(ImageData* imageData){
+    unsigned int textureID;
+    glGenTextures(1, &textureID);
+    GLenum format;
+    int nrComponents = imageData->channels;
+    if(nrComponents == 1) format = GL_RED;
+    else if(nrComponents == 3) format = GL_RGB;
+    else if(nrComponents == 4) format = GL_RGBA;
+    glBindTexture(GL_TEXTURE_2D, textureID);
+    glTexImage2D(GL_TEXTURE_2D, 0, format, imageData->width, imageData->height, 0, format, GL_UNSIGNED_BYTE, imageData->data);
+    glGenerateMipmap(GL_TEXTURE_2D);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    return textureID;
+}
 unsigned int* OpenZipFile(char* path){
     char* filenames[] = {
         (char*)"albedo.png",
@@ -462,13 +486,6 @@ std::pair<std::pair<unsigned int, unsigned int>, std::pair<unsigned int, unsigne
     glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
     return {{envCubemap, irradianceMap}, {prefilterMap, brdfLUTTexture}};
 }
-struct ImageData{
-    unsigned char* data;
-    int width;
-    int height;
-    int channels;
-    size_t dataSize;
-};
 struct TextureMetadata{
     int width;
     int height;
@@ -547,6 +564,61 @@ bool writeCustomTextureFile(const char* outputPath, unsigned int albedo, unsigne
     outputFile.close();
     std::cout << "Material file written to " << outputPath << std::endl;
     return true;
+}
+std::pair<std::pair<std::pair<unsigned int, unsigned int>,std::pair<unsigned int, unsigned int>>, unsigned int> readCustomTextureFile(const char* inputPath){
+    unsigned int albedoID;
+    unsigned int roughnessID;
+    unsigned int normalID;
+    unsigned int metallicID;
+    unsigned int aoID;
+    std::ifstream inputFile(inputPath, std::ios::binary);
+    if(!inputFile.is_open()){
+        std::cerr << "Failed to load material file" << std::endl;
+        return {{{albedoID, roughnessID}, {normalID, metallicID}}, aoID};
+    }
+    long int magicNumber;
+    inputFile.read(reinterpret_cast<char*>(&magicNumber), sizeof(magicNumber));
+    if(magicNumber != 0x4D4154455249414C) {
+        std::cerr << "Invalid file format" << std::endl;
+        return {{{albedoID, roughnessID}, {normalID, metallicID}}, aoID};
+    }
+    TextureMetadata albedoMeta, roughnessMeta, normalMeta, metalnessMeta, aoMeta;
+    inputFile.read(reinterpret_cast<char*>(&albedoMeta), sizeof(albedoMeta));
+    inputFile.read(reinterpret_cast<char*>(&roughnessMeta), sizeof(roughnessMeta));
+    inputFile.read(reinterpret_cast<char*>(&normalMeta), sizeof(normalMeta));
+    inputFile.read(reinterpret_cast<char*>(&metalnessMeta), sizeof(metalnessMeta));
+    inputFile.read(reinterpret_cast<char*>(&aoMeta), sizeof(aoMeta));
+    auto loadTextureFromStream = [&inputFile](const TextureMetadata& meta) -> ImageData* {
+        ImageData* imageData = new ImageData();
+        imageData->width = meta.width;
+        imageData->height = meta.height;
+        imageData->channels = meta.channels;
+        imageData->data = new unsigned char[meta.dataSize];
+        inputFile.read(reinterpret_cast<char*>(imageData->data), meta.dataSize);
+        return imageData;
+    };
+    ImageData* albedoData = loadTextureFromStream(albedoMeta);
+    ImageData* roughnessData = loadTextureFromStream(roughnessMeta);
+    ImageData* normalData = loadTextureFromStream(normalMeta);
+    ImageData* metalnessData = loadTextureFromStream(metalnessMeta);
+    ImageData* aoData = loadTextureFromStream(aoMeta);
+    albedoID = loadTexture(albedoData);
+    roughnessID = loadTexture(roughnessData);
+    normalID = loadTexture(normalData);
+    metallicID = loadTexture(metalnessData);
+    aoID = loadTexture(aoData);
+    delete[] albedoData->data;
+    delete albedoData;
+    delete[] roughnessData->data;
+    delete roughnessData;
+    delete[] normalData->data;
+    delete normalData;
+    delete[] metalnessData->data;
+    delete metalnessData;
+    delete[] aoData->data;
+    delete aoData;
+    inputFile.close();
+    return {{{albedoID, roughnessID}, {normalID, metallicID}}, aoID};
 }
 
 char vertexLoc[] = "./src/shaders/main.vert";
