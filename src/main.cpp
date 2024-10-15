@@ -115,6 +115,31 @@ char* SaveMatFileDialog(){
     }
     else return nullptr;
 }
+char* OpenFileDialogMaterial(){
+    static char filePath[256];
+    char currentDir[256];
+    _getcwd(currentDir, sizeof(currentDir));
+    OPENFILENAMEA ofn;
+    ZeroMemory(&ofn, sizeof(ofn));
+    ofn.lStructSize = sizeof(ofn);
+    ofn.hwndOwner = nullptr;
+    ofn.lpstrFile = filePath;
+    ofn.lpstrFile[0] = '\0';
+    ofn.nMaxFile = sizeof(filePath);
+    ofn.lpstrFilter = "Material Files (*.mat)\0*.mat\0All Files (*.*)\0*.*\0";
+    ofn.nFilterIndex = 1;
+    ofn.lpstrFileTitle = NULL;
+    ofn.nMaxFileTitle = 0;
+    ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST;
+    if(GetOpenFileNameA(&ofn)) {
+        _chdir(currentDir);
+        return filePath;
+    }
+    else {
+        _chdir(currentDir);
+        return nullptr;
+    }
+}
 #else
 #include <QFileDialog>
 #include <QString>
@@ -170,6 +195,19 @@ char* SaveMatFileDialog(){
         std::string fileStr = filename.toStdString();
         if(fileStr.find(".mat") == std::string::npos)
             fileStr += ".mat";
+        snprintf(filePath, sizeof(filePath), "%s", filename.toStdString().c_str());
+        return filePath;
+    }
+    else return nullptr;
+}
+char* OpenFileDialogMaterial(){
+    static char filePath[256];
+    int argc = 0;
+    char* argv[] = {nullptr};
+    QApplication app(argc, argv);
+    QApplication::setApplicationName("Material Viewer");
+    QString filename = QFileDialog::getOpenFileName(nullptr, "Open Material File", "", "Material Files (*.mat);;All Files (*.*)");
+    if(!filename.isEmpty()){
         snprintf(filePath, sizeof(filePath), "%s", filename.toStdString().c_str());
         return filePath;
     }
@@ -264,7 +302,7 @@ struct ImageData{
 };
 unsigned int loadTexture(ImageData* imageData){
     unsigned int textureID;
-    glGenTextures(1, &textureID);
+    glGenTextures(2, &textureID);
     GLenum format;
     int nrComponents = imageData->channels;
     if(nrComponents == 1) format = GL_RED;
@@ -671,7 +709,8 @@ char uiElementLocs[][30] = {
     "./src/ui/img_ui13.png",
     "./src/ui/img_ui14.png",
     "./src/ui/img_ui15.png",
-    "./src/ui/img_ui16.png"
+    "./src/ui/img_ui16.png",
+    "./src/ui/img_ui17.png"
 };
 glm::vec3 extraColors[sizeof(uiElementLocs)/30];
 bool highlightingUI = false;
@@ -982,6 +1021,7 @@ int main()
             envCubemap = envMaps.first.first;
             irradianceMap = envMaps.first.second;
             prefilterMap = envMaps.second.first;
+            uploadedEnv = nullptr;
         }
         else if(selectingShape){
             selectingShape = false;
@@ -1191,6 +1231,11 @@ int main()
             glUniform3fv(glGetUniformLocation(spriteProgram, "extraColor"), 1, &extraColors[15][0]);
             glBindTexture(GL_TEXTURE_2D, uiElements[15]);
             glDrawArrays(GL_TRIANGLES, 0, 6);
+            spriteModel = glm::translate(spriteModel, glm::vec3(0.0f, -1.1f, 0.0f));
+            glUniformMatrix4fv(glGetUniformLocation(spriteProgram, "model"), 1, GL_FALSE, &spriteModel[0][0]);
+            glUniform3fv(glGetUniformLocation(spriteProgram, "extraColor"), 1, &extraColors[16][0]);
+            glBindTexture(GL_TEXTURE_2D, uiElements[16]);
+            glDrawArrays(GL_TRIANGLES, 0, 6);
             spriteModel = glm::mat4(1.0f);
             spriteModel = glm::translate(spriteModel, glm::vec3((float)SCR_WIDTH / 4.0f, (float)SCR_HEIGHT / 4.0f, 0.0f));
             spriteModel = glm::scale(spriteModel, glm::vec3((float)SCR_WIDTH / 2.0f, (float)SCR_HEIGHT / 1.8f, 1.0f));
@@ -1251,12 +1296,22 @@ void uploadZip(){
         if(textures[4] != -1)
             ao = textures[4];
     }
-    else return;
 }
 void saveToFile(){
     char* matPath = SaveMatFileDialog();
+    if(matPath) writeCustomTextureFile(matPath, albedo, roughness, normal, metallic, ao);
+}
+void uploadMat(){
+    char* matPath = OpenFileDialogMaterial();
     if(matPath){
-        writeCustomTextureFile(matPath, albedo, roughness, normal, metallic, ao);
+        std::pair<std::pair<std::pair<unsigned int, unsigned int>,std::pair<unsigned int, unsigned int>>, unsigned int> result = readCustomTextureFile(matPath);
+        if(result.first.first.first != 0){
+            albedo = result.first.first.first;
+            roughness = result.first.first.second;
+            normal = result.first.second.first;
+            metallic = result.first.second.second;
+            ao = result.second;
+        }
     }
 }
 void processInput(GLFWwindow *window){
@@ -1279,6 +1334,8 @@ void processInput(GLFWwindow *window){
             uploadZip();
         else if(currentElement == 15)
             saveToFile();
+        else if(currentElement == 16)
+            uploadMat();
     }
 }
 void hoverElement(int elementNum){
@@ -1310,6 +1367,9 @@ void mouseCallback(GLFWwindow* window, double xposIn, double yposIn){
             }
             else if(yposIn < SCR_HEIGHT / 4.0f + 150.0f && yposIn > SCR_HEIGHT / 4.0f + 100.0f && xposIn > SCR_WIDTH * 3.0f / 4.0f - 60.0f && xposIn < SCR_WIDTH * 3.0f / 4.0f - 10.0f){
                 hoverElement(15); highlightingUI = true;
+            }
+            else if(yposIn < SCR_HEIGHT / 4.0f + 205.0f && yposIn > SCR_HEIGHT / 4.0f + 155.0f && xposIn > SCR_WIDTH * 3.0f / 4.0f - 60.0f && xposIn < SCR_WIDTH * 3.0f / 4.0f - 10.0f){
+                hoverElement(16); highlightingUI = true;
             }
             else if(xposIn > SCR_WIDTH / 4.0f + 20.0f && xposIn < SCR_WIDTH / 4.0f + 70.0f){
                 if(yposIn > SCR_HEIGHT / 4.0f + 20.0f && yposIn < SCR_HEIGHT / 4.0f + 70.0f) {
