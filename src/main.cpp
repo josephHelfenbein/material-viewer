@@ -685,11 +685,12 @@ const char* brdfFragmentShaderSource = getShaders(brdfFragmentLoc);
 const char* brdfVertexShaderSource = getShaders(brdfVertexLoc);
 const char* uiVertexShaderSource = getShaders(uiVertexLoc);
 const char* uiFragmentShaderSource = getShaders(uiFragmentLoc);
-char albedoLoc[] = "./src/material/albedo.png";
-char aoLoc[] = "./src/material/ao.png";
-char metallicLoc[] = "./src/material/metallic.png";
-char normalLoc[] = "./src/material/normal.png";
-char roughnessLoc[] = "./src/material/roughness.png";
+char defaultMatLoc[] = "./src/material/stainless_steel.mat";
+char albedoLoc[] = "./src/material/albedoNot.png";
+char aoLoc[] = "./src/material/aoNot.png";
+char metallicLoc[] = "./src/material/metallicNot.png";
+char normalLoc[] = "./src/material/normalNot.png";
+char roughnessLoc[] = "./src/material/roughnessNot.png";
 char environmentLocs[][70] = {
     "./src/environments/industrial_sunset_puresky/environment.hdr",
     "./src/environments/kloppenheim_02_puresky/environment.hdr",
@@ -977,11 +978,13 @@ int main()
     unsigned int prefilterMap = envMaps.second.first;
     unsigned int brdfMap = envMaps.second.second;
 
-    albedo = loadTexture(albedoLoc);
-    metallic = loadTexture(metallicLoc);
-    normal = loadTexture(normalLoc);
-    roughness = loadTexture(roughnessLoc);
-    ao = loadTexture(aoLoc);
+    std::pair<std::pair<std::pair<unsigned int, unsigned int>,std::pair<unsigned int, unsigned int>>, unsigned int> defaultMat = readCustomTextureFile(defaultMatLoc);
+    albedo = defaultMat.first.first.first;
+    roughness = defaultMat.first.first.second;
+    normal = defaultMat.first.second.first;
+    metallic = defaultMat.first.second.second;
+    ao = defaultMat.second;
+
     for(unsigned int i=0; i<sizeof(extraColors) / 12; i++){
         extraColors[i] = glm::vec3(1.0f);
     }
@@ -1293,14 +1296,19 @@ void uploadZip(){
         unsigned int* textures = OpenZipFile(newZip);
         if(textures[0] != -1)
             albedo = textures[0];
+        else albedo = loadTexture(albedoLoc);
         if(textures[1] != -1)
             metallic = textures[1];
+        else metallic = loadTexture(metallicLoc);
         if(textures[2] != -1)
             normal = textures[2];
+        else normal = loadTexture(normalLoc);
         if(textures[3] != -1)
             roughness = textures[3];
+        else roughness = loadTexture(roughnessLoc);
         if(textures[4] != -1)
             ao = textures[4];
+        else ao = loadTexture(aoLoc);
     }
 }
 void saveToFile(){
