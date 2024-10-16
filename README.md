@@ -31,6 +31,9 @@
 <br />
 <div align="center">
 
+<a href="https://github.com/josephHelfenbein/material-viewer">
+    <img src="src/resources/materialviewer-logo.svg" alt="Logo" width="80" height="80">
+  </a>
 
 <h3 align="center">Material Viewer</h3>
 
