@@ -111,9 +111,13 @@ char* SaveMatFileDialog(){
         std::string fileStr(filePath);
         if(fileStr.find(".mat") == std::string::npos)
             fileStr += ".mat";
+        _chdir(currentDir);
         return _strdup(fileStr.c_str());
     }
-    else return nullptr;
+    else {
+        _chdir(currentDir);
+        return nullptr;
+    }
 }
 char* OpenFileDialogMaterial(){
     static char filePath[256];
@@ -577,7 +581,7 @@ bool writeCustomTextureFile(const char* outputPath, unsigned int albedo, unsigne
         std::cerr << "Failed to open output file " << outputPath << std::endl;
         return false;
     }
-    long int magicNumber = 0x4D4154455249414C;
+    long long int magicNumber = 0x4D4154455249414C;
     outputFile.write(reinterpret_cast<const char*>(&magicNumber), sizeof(magicNumber));
     outputFile.write(reinterpret_cast<const char*>(&albedoMeta), sizeof(albedoMeta));
     outputFile.write(reinterpret_cast<const char*>(&roughnessMeta), sizeof(roughnessMeta));
@@ -614,7 +618,7 @@ std::pair<std::pair<std::pair<unsigned int, unsigned int>,std::pair<unsigned int
         std::cerr << "Failed to load material file" << std::endl;
         return {{{albedoID, roughnessID}, {normalID, metallicID}}, aoID};
     }
-    long int magicNumber;
+    long long int magicNumber;
     inputFile.read(reinterpret_cast<char*>(&magicNumber), sizeof(magicNumber));
     if(magicNumber != 0x4D4154455249414C) {
         std::cerr << "Invalid file format" << std::endl;
