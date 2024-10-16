@@ -717,6 +717,7 @@ char uiElementLocs[][30] = {
     "./src/ui/img_ui17.png"
 };
 glm::vec3 extraColors[sizeof(uiElementLocs)/30];
+char backgroundLoc[] = "./src/resources/background.png";
 bool highlightingUI = false;
 bool selectingEnv = false;
 bool selectingShape = false;
@@ -988,6 +989,7 @@ int main()
     for(unsigned int i=0; i<sizeof(uiElementLocs)/30; i++){
         uiElements[i] = loadTexture(uiElementLocs[i]);
     }
+    unsigned int uiBackground = loadTexture(backgroundLoc);
 
     unsigned int spriteVBO, spriteVAO;
     float spriteVertices[] = {
@@ -1241,11 +1243,11 @@ int main()
             glBindTexture(GL_TEXTURE_2D, uiElements[16]);
             glDrawArrays(GL_TRIANGLES, 0, 6);
             spriteModel = glm::mat4(1.0f);
-            spriteModel = glm::translate(spriteModel, glm::vec3((float)SCR_WIDTH / 4.0f, (float)SCR_HEIGHT / 4.0f, 0.0f));
-            spriteModel = glm::scale(spriteModel, glm::vec3((float)SCR_WIDTH / 2.0f, (float)SCR_HEIGHT / 1.8f, 1.0f));
+            spriteModel = glm::translate(spriteModel, glm::vec3((float)SCR_WIDTH * 0.085f, (float)SCR_HEIGHT * 0.95f, 0.0f));
+            spriteModel = glm::scale(spriteModel, glm::vec3((float)SCR_WIDTH / 1.2f, -(float)SCR_HEIGHT / 1.2f, 1.0f));
             glUniformMatrix4fv(glGetUniformLocation(spriteProgram, "model"), 1, GL_FALSE, &spriteModel[0][0]);
             glUniform3fv(glGetUniformLocation(spriteProgram, "extraColor"), 1, &glm::vec3(1.0f, 1.0f, 1.0f)[0]);
-            glBindTexture(GL_TEXTURE_2D, 0);
+            glBindTexture(GL_TEXTURE_2D, uiBackground);
             glDrawArrays(GL_TRIANGLES, 0, 6);
         }
 
