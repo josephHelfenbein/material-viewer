@@ -54,7 +54,6 @@
   <summary>Table of Contents</summary>
   <ol>
     <li><a href="#about-the-project">About The Project</a></li>
-    <li><a href="#roadmap">Roadmap</a></li>
     <li><a href="#license">License</a></li>
     <li><a href="#acknowledgments">Acknowledgments</a></li>
   </ol>
@@ -74,24 +73,6 @@ A 3D desktop application to preview PBR materials made using OpenGL and C++. Fea
 * [![OpenGL][OpenGL]][OpenGL-url]
 
 
-
-<!-- ROADMAP -->
-## Roadmap
-
-- [x] Camera Movement
-- [x] Cube rendering
-- [x] Sphere rendering
-- [x] HDRI background
-- [x] UI
-- [x] Diffuse IBL
-- [x] Specular IBL
-- [x] Upload HDRI
-- [x] Material from images
-- [x] Material from zip
-- [ ] Fuzzy matching for files in zip
-- [x] Material from file
-- [x] Save to material file
-- [ ] Opening material viewer from explorer
 
 See the [open issues](https://github.com/josephHelfenbein/material-viewer/issues) for a full list of proposed features (and known issues).
 
