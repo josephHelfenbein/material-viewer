@@ -234,13 +234,18 @@ float deltaTime = 0.0f;
 float lastFrame = 0.0f;
 bool firstMouse = true;
 bool pressMouse = false;
+std::string error = "";
+float errorTime = 0.0f;
+std::string tooltip = "";
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void mouseCallback(GLFWwindow* window, double xpos, double ypos);
 void processInput(GLFWwindow *window);
 char* getShaders(char file[]){
     FILE* shaderFile = fopen(file, "r");
     if(!shaderFile) {
-        std::cout<<"Error opening shader file at "<<file<<"\n";
+        std::cerr<<"Error opening shader file at "<<file<<"\n";
+        error = "Error opening shader file.";
+        errorTime = 0.0f;
         return nullptr;
     }
     int fileSize = 0;
@@ -265,7 +270,9 @@ unsigned int loadEnv(char file[]){
         stbi_image_free(data);
     }
     else{
-        std::cout<<"HDR image failed to load at path "<<file<<std::endl;
+        std::cerr<<"HDR image failed to load at path "<<file<<std::endl;
+        error = "HDR image failed to load.";
+        errorTime = 0.0f;
         stbi_image_free(data);
     }
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -294,7 +301,9 @@ unsigned int loadTexture(char file[]){
         stbi_image_free(data);
     }
     else{
-        std::cout<<"Texture image filed to load at path "<<file<<std::endl;
+        std::cerr<<"Texture image failed to load at path "<<file<<std::endl;
+        error = "Texture image failed to load.";
+        errorTime = 0.0f;
         stbi_image_free(data);
     }
     return textureID;
@@ -342,10 +351,14 @@ unsigned int* OpenZipFile(char* path){
     for(unsigned int i=0; i<numTextures; i++){
         zip_file* zfile = zip_fopen(archive, filenames[i], 0);
         if(!zfile) {
+            error = "Could not find one or more textures.";
+            errorTime = 0.0f;
             continue;
         }
         FILE* output = fopen(filenames[i], "wb");
         if(!output){
+            error = "Could not load one or more textures";
+            errorTime = 0.0f;
             zip_fclose(zfile);
             continue;
         }
@@ -370,7 +383,9 @@ unsigned int createShader(const char* vertSource, const char* fragSource){
     glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &success);
     if(!success){
         glGetShaderInfoLog(vertexShader, 512, nullptr, infoLog);
-        std::cout<<"A vertex shader compilation failed.\n"<<infoLog<<std::endl;
+        std::cerr<<"A vertex shader compilation failed.\n"<<infoLog<<std::endl;
+        error = "A vertex shader compilation failed.";
+        errorTime = 0.0f;
     }
     unsigned int fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
     glShaderSource(fragmentShader, 1, &fragSource, nullptr);
@@ -378,7 +393,9 @@ unsigned int createShader(const char* vertSource, const char* fragSource){
     glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &success);
     if(!success){
         glGetShaderInfoLog(fragmentShader, 512, nullptr, infoLog);
-        std::cout<<"A fragment shader compilation failed.\n"<<infoLog<<std::endl;
+        std::cerr<<"A fragment shader compilation failed.\n"<<infoLog<<std::endl;
+        error = "A fragment shader compilation failed.";
+        errorTime = 0.0f;
     }
     unsigned int shaderProgram = glCreateProgram();
     glAttachShader(shaderProgram, vertexShader);
@@ -387,7 +404,9 @@ unsigned int createShader(const char* vertSource, const char* fragSource){
     glGetProgramiv(shaderProgram, GL_LINK_STATUS, &success);
     if(!success){
         glGetProgramInfoLog(shaderProgram, 512, nullptr, infoLog);
-        std::cout << "Linking shader program failed. \n"<<infoLog<<std::endl;
+        std::cerr << "Linking shader program failed. \n"<<infoLog<<std::endl;
+        error = "Linking shader program failed.";
+        errorTime = 0.0f;
     }
     glDeleteShader(vertexShader);
     glDeleteShader(fragmentShader);
@@ -555,6 +574,8 @@ ImageData* loadTextureData(unsigned int textureID){
             break;
         default:
             std::cerr<<"Unsupported texture format."<<std::endl;
+            error = "Unsupported texture format.";
+            errorTime = 0.0f;
             delete imgData;
             return nullptr;
     }
@@ -571,6 +592,8 @@ bool writeCustomTextureFile(const char* outputPath, unsigned int albedo, unsigne
     ImageData* aoData = loadTextureData(ao);
     if (!albedoData || !roughnessData || !normalData || !metalnessData || !aoData) {
         std::cerr << "Failed to load one or more texture data." << std::endl;
+        error = "Failed to load one or more texture data.";
+        errorTime = 0.0f;
         return false;
     }
     TextureMetadata albedoMeta = { albedoData->width, albedoData->height, albedoData->channels, static_cast<unsigned int>(albedoData->width * albedoData->height * albedoData->channels) };
@@ -581,6 +604,8 @@ bool writeCustomTextureFile(const char* outputPath, unsigned int albedo, unsigne
     std::ofstream outputFile(outputPath, std::ios::binary);
     if (!outputFile.is_open()) {
         std::cerr << "Failed to open output file " << outputPath << std::endl;
+        error = "Failed to open output file.";
+        errorTime = 0.0f;
         return false;
     }
     long long int magicNumber = 0x4D4154455249414C;
@@ -618,12 +643,16 @@ std::pair<std::pair<std::pair<unsigned int, unsigned int>,std::pair<unsigned int
     std::ifstream inputFile(inputPath, std::ios::binary);
     if(!inputFile.is_open()){
         std::cerr << "Failed to load material file" << std::endl;
+        error = "Failed to load material file.";
+        errorTime = 0.0f;
         return {{{albedoID, roughnessID}, {normalID, metallicID}}, aoID};
     }
     long long int magicNumber;
     inputFile.read(reinterpret_cast<char*>(&magicNumber), sizeof(magicNumber));
     if(magicNumber != 0x4D4154455249414C) {
         std::cerr << "Invalid file format" << std::endl;
+        error = "Invalid file format.";
+        errorTime = 0.0f;
         return {{{albedoID, roughnessID}, {normalID, metallicID}}, aoID};
     }
     TextureMetadata albedoMeta, roughnessMeta, normalMeta, metalnessMeta, aoMeta;
@@ -675,12 +704,16 @@ void prepareCharacters(){
     FT_Library ft;
     if(FT_Init_FreeType(&ft)) {
         std::cerr<<"Could not initialize FreeType"<<std::endl;
+        error = "Could not initialize FreeType.";
+        errorTime = 0.0f;
         FT_Done_FreeType(ft);
         return;
     }
     FT_Face face;
     if(FT_New_Face(ft, "./src/resources/Roboto-Regular.ttf", 0, &face)){
         std::cerr<<"Could not load font"<<std::endl;
+        error = "Could not load font.";
+        errorTime = 0.0f;
         FT_Done_Face(face);
         FT_Done_FreeType(ft);
         return;
@@ -811,13 +844,12 @@ unsigned int metallic;
 unsigned int normal;
 unsigned int roughness;
 unsigned int ao;
-std::string tooltip = "";
 
 int main()
 {   
     if (!glfwInit())
     {
-        std::cout << "Failed to initialize GLFW" << std::endl;
+        std::cerr << "Failed to initialize GLFW" << std::endl;
         return -1;
     }
 
@@ -830,7 +862,7 @@ int main()
     window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "Material Viewer (Alpha)", nullptr, nullptr);
     if (window == nullptr)
     {
-        std::cout << "Failed to open GLFW window" << std::endl;
+        std::cerr << "Failed to open GLFW window" << std::endl;
         glfwTerminate();
         return -1;
     }
@@ -840,7 +872,7 @@ int main()
 
     if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
     {
-        std::cout << "Failed to initialize GLAD" << std::endl;
+        std::cerr << "Failed to initialize GLAD" << std::endl;
         return -1;
     }
     glEnable(GL_DEPTH_TEST);
@@ -1207,6 +1239,13 @@ int main()
 
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        
+        if(error != ""){
+            RenderText(textProgram, textVAO, textVBO, error, 10.0f, (float)SCR_HEIGHT - 20.0f, 0.35f, glm::vec3(0.8f, 0.2f, 0.2f));
+            errorTime += deltaTime;
+            if(errorTime >= 7.0f) error = "";
+        }
+        else errorTime = 0.0f;
         if(tooltip != ""){
             tooltipTime += deltaTime;
             if(tooltipTime >= 0.5f){
