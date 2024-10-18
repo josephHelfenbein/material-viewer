@@ -811,6 +811,7 @@ unsigned int metallic;
 unsigned int normal;
 unsigned int roughness;
 unsigned int ao;
+std::string tooltip = "";
 
 int main()
 {   
@@ -1105,6 +1106,7 @@ int main()
     prepareCharacters();
 
     bool isCube = false;
+    float tooltipTime = 0.0f;
 
     while(!glfwWindowShouldClose(window)) {
         float currentFrame = static_cast<float>(glfwGetTime());
@@ -1205,6 +1207,25 @@ int main()
 
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        if(tooltip != ""){
+            tooltipTime += deltaTime;
+            if(tooltipTime >= 0.5f){
+                RenderText(textProgram, textVAO, textVBO, tooltip, lastX, (float)SCR_HEIGHT - lastY, 0.35f, glm::vec3(0.8f, 0.8f, 0.8f));
+                glUseProgram(spriteProgram);
+                glm::mat4 spriteModel = glm::mat4(1.0f);
+                spriteModel = glm::translate(spriteModel, glm::vec3(lastX - 2.5f, (float)SCR_HEIGHT - lastY - 2.5f, 0.0f));
+                spriteModel = glm::scale(spriteModel, glm::vec3(8.5f * tooltip.size(), 20.0f, 1.0f));
+                glm::mat4 textProj = glm::ortho(0.0f, (float)SCR_WIDTH, 0.0f, (float)SCR_HEIGHT);
+                glUniformMatrix4fv(glGetUniformLocation(spriteProgram, "model"), 1, GL_FALSE, &spriteModel[0][0]);
+                glUniformMatrix4fv(glGetUniformLocation(spriteProgram, "projection"), 1, GL_FALSE, &textProj[0][0]);
+                glUniform3fv(glGetUniformLocation(spriteProgram, "extraColor"), 1, &glm::vec3(0.5f, 0.5f, 0.5f)[0]);
+                glActiveTexture(GL_TEXTURE0);
+                glBindTexture(GL_TEXTURE_2D, 0);
+                glBindVertexArray(spriteVAO);
+                glDrawArrays(GL_TRIANGLES, 0, 6);
+            }
+        }
+        else tooltipTime = 0.0f;
         glm::mat4 orthoProj = glm::ortho(0.0f, (float)SCR_WIDTH, (float)SCR_HEIGHT, 0.0f, -1.0f, 1.0f);
         glm::mat4 spriteModel = glm::mat4(1.0f);
         glUseProgram(spriteProgram);
@@ -1430,6 +1451,7 @@ void hoverElement(int elementNum){
         extraColors[elementNum] = glm::vec3(1.3f, 1.3f, 1.6f);
         currentElement = elementNum;
     }
+    else tooltip = "";
     return;
 }
 void mouseCallback(GLFWwindow* window, double xposIn, double yposIn){
@@ -1439,21 +1461,19 @@ void mouseCallback(GLFWwindow* window, double xposIn, double yposIn){
         firstMouse = true;
         if(showMaterialUI){
             if(yposIn > SCR_HEIGHT / 4.0f + 20.0f && yposIn < SCR_HEIGHT / 4.0f + 40.0f && xposIn > SCR_WIDTH * 3.0f / 4.0f - 30.0f && xposIn < SCR_WIDTH * 3.0f / 4.0f - 10.0f){
-                hoverElement(8);
-                highlightingUI = true;
+                hoverElement(8); highlightingUI = true;
             }
             else if(yposIn > SCR_HEIGHT * 29.0f / 36.0f || yposIn < SCR_HEIGHT / 4.0f || xposIn < SCR_WIDTH / 4.0f || xposIn > SCR_WIDTH * 3.0f / 4.0f){
-                currentElement = 8;
-                highlightingUI = true;
+                hoverElement(-1); currentElement = 8; highlightingUI = true;
             }
             else if(yposIn < SCR_HEIGHT / 4.0f + 95.0f && yposIn > SCR_HEIGHT / 4.0f + 45.0f && xposIn > SCR_WIDTH * 3.0f / 4.0f - 60.0f && xposIn < SCR_WIDTH * 3.0f / 4.0f - 10.0f){
-                hoverElement(14); highlightingUI = true;
+                hoverElement(14); highlightingUI = true; tooltip = "Upload .zip";
             }
             else if(yposIn < SCR_HEIGHT / 4.0f + 150.0f && yposIn > SCR_HEIGHT / 4.0f + 100.0f && xposIn > SCR_WIDTH * 3.0f / 4.0f - 60.0f && xposIn < SCR_WIDTH * 3.0f / 4.0f - 10.0f){
-                hoverElement(15); highlightingUI = true;
+                hoverElement(15); highlightingUI = true; tooltip = "Save .mat";
             }
             else if(yposIn < SCR_HEIGHT / 4.0f + 205.0f && yposIn > SCR_HEIGHT / 4.0f + 155.0f && xposIn > SCR_WIDTH * 3.0f / 4.0f - 60.0f && xposIn < SCR_WIDTH * 3.0f / 4.0f - 10.0f){
-                hoverElement(16); highlightingUI = true;
+                hoverElement(16); highlightingUI = true; tooltip = "Upload .mat";
             }
             else if(xposIn > SCR_WIDTH / 4.0f + 20.0f && xposIn < SCR_WIDTH / 4.0f + 70.0f){
                 if(yposIn > SCR_HEIGHT / 4.0f + 20.0f && yposIn < SCR_HEIGHT / 4.0f + 70.0f) {
@@ -1480,10 +1500,10 @@ void mouseCallback(GLFWwindow* window, double xposIn, double yposIn){
             else if(xposIn > 60.0f && xposIn < 110.0f) {hoverElement(1); highlightingUI = true;}
             else if(xposIn > 110.0f && xposIn < 160.0f) {hoverElement(2); highlightingUI = true;}
             else if(xposIn > 160.0f && xposIn < 210.0f) {hoverElement(3); highlightingUI = true;}
-            else if(xposIn > 210.0f && xposIn < 260.0f) {hoverElement(6); highlightingUI = true;}
+            else if(xposIn > 210.0f && xposIn < 260.0f) {hoverElement(6); highlightingUI = true; tooltip = "Upload HDRI environment";}
             else if(xposIn > SCR_WIDTH - 60.0f && xposIn < SCR_WIDTH - 10.0f) {hoverElement(4); highlightingUI = true;}
             else if(xposIn > SCR_WIDTH - 110.0f && xposIn < SCR_WIDTH - 60.0f) {hoverElement(5); highlightingUI = true;}
-            else if(xposIn > SCR_WIDTH - 160.0f && xposIn < SCR_WIDTH - 110.0f) {hoverElement(7); highlightingUI = true;}
+            else if(xposIn > SCR_WIDTH - 160.0f && xposIn < SCR_WIDTH - 110.0f) {hoverElement(7); highlightingUI = true; tooltip = "Change material";}
             else if(highlightingUI) {hoverElement(-1); highlightingUI = false;}
         }
         else if(highlightingUI) {hoverElement(-1); highlightingUI = false;}
