@@ -9,6 +9,8 @@
 #include <stb_image.h>
 #include <zip.h>
 #include <fstream>
+#include <ft2build.h>
+#include FT_FREETYPE_H
 
 #if defined(_WIN32) || defined(__CYGWIN__)
 #include <windows.h>
@@ -662,6 +664,83 @@ std::pair<std::pair<std::pair<unsigned int, unsigned int>,std::pair<unsigned int
     inputFile.close();
     return {{{albedoID, roughnessID}, {normalID, metallicID}}, aoID};
 }
+struct Character{
+    unsigned int textureID;
+    glm::ivec2 size;
+    glm::ivec2 bearing;
+    unsigned int advance;
+};
+std::map<char, Character> Characters;
+void prepareCharacters(){
+    FT_Library ft;
+    if(FT_Init_FreeType(&ft)) {
+        std::cerr<<"Could not initialize FreeType"<<std::endl;
+        FT_Done_FreeType(ft);
+        return;
+    }
+    FT_Face face;
+    if(FT_New_Face(ft, "./src/resources/Roboto-Regular.ttf", 0, &face)){
+        std::cerr<<"Could not load font"<<std::endl;
+        FT_Done_Face(face);
+        FT_Done_FreeType(ft);
+        return;
+    }
+    FT_Set_Pixel_Sizes(face, 0, 48);
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+    for(unsigned char c = 0; c < 128; c++){
+        if(FT_Load_Char(face, c, FT_LOAD_RENDER)){
+            std::cerr<<"Failed to load gylph: "<<c<<std::endl;
+            continue;
+        }
+        unsigned int textureID;
+        glGenTextures(1, &textureID);
+        glBindTexture(GL_TEXTURE_2D, textureID);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, face->glyph->bitmap.width, face->glyph->bitmap.rows, 0, GL_RED, GL_UNSIGNED_BYTE, face->glyph->bitmap.buffer);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        Character character = {textureID, glm::ivec2(face->glyph->bitmap.width, face->glyph->bitmap.rows), glm::ivec2(face->glyph->bitmap_left, face->glyph->bitmap_top), static_cast<unsigned int>(face->glyph->advance.x)};
+        Characters.insert(std::pair<char, Character>(c, character));
+    }
+    glBindTexture(GL_TEXTURE_2D, 0);
+    FT_Done_Face(face);
+    FT_Done_FreeType(ft);
+}
+void RenderText(unsigned int shader, unsigned int VAO, unsigned int VBO, std::string text, float x, float y, float scale, glm::vec3 color){
+    glUseProgram(shader);
+    glm::mat4 textProj = glm::ortho(0.0f, (float)SCR_WIDTH, 0.0f, (float)SCR_HEIGHT);
+    glUniformMatrix4fv(glGetUniformLocation(shader, "projection"), 1, GL_FALSE, &textProj[0][0]);
+    glUniform3f(glGetUniformLocation(shader, "textColor"), color.x, color.y, color.z);
+    glm::mat4 spriteModel = glm::mat4(1.0f);
+    glUniformMatrix4fv(glGetUniformLocation(shader, "model"), 1, GL_FALSE, &spriteModel[0][0]);
+    glActiveTexture(GL_TEXTURE0);
+    glBindVertexArray(VAO);
+    std::string::const_iterator c;
+    for(c = text.begin(); c != text.end(); c++){
+        Character ch = Characters[*c];
+        float xPos = x + ch.bearing.x * scale;
+        float yPos = y - (ch.size.y - ch.bearing.y) * scale;
+        float w = ch.size.x * scale;
+        float h = ch.size.y * scale;
+        float vertices[6][4] = {
+            {xPos, yPos + h, 0.0f, 0.0f},            
+            {xPos, yPos, 0.0f, 1.0f},
+            {xPos + w, yPos, 1.0f, 1.0f},
+            {xPos, yPos + h, 0.0f, 0.0f},
+            {xPos + w, yPos, 1.0f, 1.0f},
+            {xPos + w, yPos + h, 1.0f, 0.0f}    
+        };
+        glBindTexture(GL_TEXTURE_2D, ch.textureID);
+        glBindBuffer(GL_ARRAY_BUFFER, VBO);
+        glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vertices), vertices);
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+        x += (ch.advance >> 6) * scale;
+    }
+    glBindVertexArray(0);
+    glBindTexture(GL_TEXTURE_2D, 0);
+}
 
 char vertexLoc[] = "./src/shaders/main.vert";
 char fragmentLoc[] = "./src/shaders/main.frag";
@@ -674,6 +753,7 @@ char brdfFragmentLoc[] = "./src/shaders/brdf.frag";
 char brdfVertexLoc[] = "./src/shaders/brdf.vert";
 char uiVertexLoc[] = "./src/shaders/ui.vert";
 char uiFragmentLoc[] = "./src/shaders/ui.frag";
+char textFragmentLoc[] = "./src/shaders/text.frag";
 const char* vertexShaderSource = getShaders(vertexLoc);
 const char* fragmentShaderSource = getShaders(fragmentLoc);
 const char* skyFragmentShaderSource = getShaders(skyFragmentLoc);
@@ -685,6 +765,7 @@ const char* brdfFragmentShaderSource = getShaders(brdfFragmentLoc);
 const char* brdfVertexShaderSource = getShaders(brdfVertexLoc);
 const char* uiVertexShaderSource = getShaders(uiVertexLoc);
 const char* uiFragmentShaderSource = getShaders(uiFragmentLoc);
+const char* textFragmentShaderSource = getShaders(textFragmentLoc);
 char defaultMatLoc[] = "./src/material/stainless_steel.mat";
 char albedoLoc[] = "./src/material/albedoNot.png";
 char aoLoc[] = "./src/material/aoNot.png";
@@ -945,13 +1026,9 @@ int main()
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
     
     unsigned int skyShaderProgram = createShader(cubemapVertexShaderSource, skyFragmentShaderSource);
-
     unsigned int cubemapShaderProgram = createShader(cubemapVertexShaderSource, cubemapFragmentShaderSource);
-    
     unsigned int irradianceShaderProgram = createShader(cubemapVertexShaderSource, irradianceFragmentShaderSource);
-
     unsigned int prefilterShaderProgram = createShader(cubemapVertexShaderSource, prefilterFragmentShaderSource);
-
     unsigned int brdfShaderProgram = createShader(brdfVertexShaderSource, brdfFragmentShaderSource);
 
     unsigned int quadVAO;
@@ -1014,6 +1091,18 @@ int main()
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
     unsigned int spriteProgram = createShader(uiVertexShaderSource, uiFragmentShaderSource);
+    unsigned int textProgram = createShader(uiVertexShaderSource, textFragmentShaderSource);
+    unsigned int textVAO, textVBO;
+    glGenVertexArrays(1, &textVAO);
+    glGenBuffers(1, &textVBO);
+    glBindVertexArray(textVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, textVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(float) * 6 * 4, NULL, GL_DYNAMIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float), 0);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindVertexArray(0);
+    prepareCharacters();
 
     bool isCube = false;
 
@@ -1021,7 +1110,6 @@ int main()
         float currentFrame = static_cast<float>(glfwGetTime());
         deltaTime = currentFrame - lastFrame;
         lastFrame = currentFrame;
-
         processInput(window);
 
         if(selectingEnv){
@@ -1195,33 +1283,15 @@ int main()
             glUniform3fv(glGetUniformLocation(spriteProgram, "extraColor"), 1, &extraColors[13][0]);
             glBindTexture(GL_TEXTURE_2D, ao);
             glDrawArrays(GL_TRIANGLES, 0, 6);
-            spriteModel = glm::mat4(1.0f);
-            spriteModel = glm::translate(spriteModel, glm::vec3((float)SCR_WIDTH / 4.0f + 80.0f, (float)SCR_HEIGHT / 4.0f + 70.0f, 0.0f));
-            spriteModel = glm::scale(spriteModel, glm::vec3(160.0f, -50.0f, 1.0f));
-            glUniformMatrix4fv(glGetUniformLocation(spriteProgram, "model"), 1, GL_FALSE, &spriteModel[0][0]);
-            glUniform3fv(glGetUniformLocation(spriteProgram, "extraColor"), 1, &extraColors[9][0]);
-            glBindTexture(GL_TEXTURE_2D, uiElements[9]);
-            glDrawArrays(GL_TRIANGLES, 0, 6);
-            spriteModel = glm::translate(spriteModel, glm::vec3(0.0f, -1.2f, 0.0f));
-            glUniformMatrix4fv(glGetUniformLocation(spriteProgram, "model"), 1, GL_FALSE, &spriteModel[0][0]);
-            glUniform3fv(glGetUniformLocation(spriteProgram, "extraColor"), 1, &extraColors[10][0]);
-            glBindTexture(GL_TEXTURE_2D, uiElements[10]);
-            glDrawArrays(GL_TRIANGLES, 0, 6);
-            spriteModel = glm::translate(spriteModel, glm::vec3(0.0f, -1.2f, 0.0f));
-            glUniformMatrix4fv(glGetUniformLocation(spriteProgram, "model"), 1, GL_FALSE, &spriteModel[0][0]);
-            glUniform3fv(glGetUniformLocation(spriteProgram, "extraColor"), 1, &extraColors[11][0]);
-            glBindTexture(GL_TEXTURE_2D, uiElements[11]);
-            glDrawArrays(GL_TRIANGLES, 0, 6);
-            spriteModel = glm::translate(spriteModel, glm::vec3(0.0f, -1.2f, 0.0f));
-            glUniformMatrix4fv(glGetUniformLocation(spriteProgram, "model"), 1, GL_FALSE, &spriteModel[0][0]);
-            glUniform3fv(glGetUniformLocation(spriteProgram, "extraColor"), 1, &extraColors[12][0]);
-            glBindTexture(GL_TEXTURE_2D, uiElements[12]);
-            glDrawArrays(GL_TRIANGLES, 0, 6);
-            spriteModel = glm::translate(spriteModel, glm::vec3(0.0f, -1.2f, 0.0f));
-            glUniformMatrix4fv(glGetUniformLocation(spriteProgram, "model"), 1, GL_FALSE, &spriteModel[0][0]);
-            glUniform3fv(glGetUniformLocation(spriteProgram, "extraColor"), 1, &extraColors[13][0]);
-            glBindTexture(GL_TEXTURE_2D, uiElements[13]);
-            glDrawArrays(GL_TRIANGLES, 0, 6);
+            RenderText(textProgram, textVAO, textVBO, "Base Color", (float)SCR_WIDTH / 4.0f + 80.0f, (float)SCR_HEIGHT * 3.0f / 4.0f - 50.0f, 0.4f, glm::vec3(0.8f, 0.8f, 0.8f) * extraColors[9]);
+            RenderText(textProgram, textVAO, textVBO, "Metalness", (float)SCR_WIDTH / 4.0f + 80.0f, (float)SCR_HEIGHT * 3.0f / 4.0f - 110.0f, 0.4f, glm::vec3(0.8f, 0.8f, 0.8f) * extraColors[10]);
+            RenderText(textProgram, textVAO, textVBO, "Normal Map", (float)SCR_WIDTH / 4.0f + 80.0f, (float)SCR_HEIGHT * 3.0f / 4.0f - 170.0f, 0.4f, glm::vec3(0.8f, 0.8f, 0.8f) * extraColors[11]);
+            RenderText(textProgram, textVAO, textVBO, "Roughness", (float)SCR_WIDTH / 4.0f + 80.0f, (float)SCR_HEIGHT * 3.0f / 4.0f - 230.0f, 0.4f, glm::vec3(0.8f, 0.8f, 0.8f) * extraColors[12]);
+            RenderText(textProgram, textVAO, textVBO, "Ambient Occlusion", (float)SCR_WIDTH / 4.0f + 80.0f, (float)SCR_HEIGHT * 3.0f / 4.0f - 290.0f, 0.4f, glm::vec3(0.8f, 0.8f, 0.8f) * extraColors[13]);
+            glUseProgram(spriteProgram);
+            glBindVertexArray(spriteVAO);
+            glUniformMatrix4fv(glGetUniformLocation(spriteProgram, "projection"), 1, GL_FALSE, &orthoProj[0][0]);
+            glActiveTexture(GL_TEXTURE0);
             spriteModel = glm::mat4(1.0f);
             spriteModel = glm::translate(spriteModel, glm::vec3((float)SCR_WIDTH * 3.0f / 4.0f - 30.0f, (float)SCR_HEIGHT / 4.0f + 20.0f, 0.0f));
             spriteModel = glm::scale(spriteModel, glm::vec3(20.0f, 20.0f, 1.0f));
