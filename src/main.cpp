@@ -911,8 +911,7 @@ unsigned int normal;
 unsigned int roughness;
 unsigned int ao;
 
-int main()
-{   
+int main(int argc, char* argv[]) {   
     if (!glfwInit()) {
         std::cerr << "Failed to initialize GLFW" << std::endl;
         return -1;
@@ -1041,6 +1040,19 @@ int main()
     normal = defaultMat.first.second.first;
     metallic = defaultMat.first.second.second;
     ao = defaultMat.second;
+    if (argc > 1) {
+        std::cout << "Opening file: " << argv[1] << std::endl;
+        std::pair<std::pair<std::pair<unsigned int, unsigned int>,std::pair<unsigned int, unsigned int>>, unsigned int> result = readCustomTextureFile(argv[1]);
+        if(result.first.first.first != 0){
+            albedo = result.first.first.first;
+            roughness = result.first.first.second;
+            normal = result.first.second.first;
+            metallic = result.first.second.second;
+            ao = result.second;
+        }
+        else error="Failed to read material file";
+    } 
+    else std::cout << "No file provided." << std::endl;
 
     for(unsigned int i=0; i<sizeof(extraColors) / 12; i++){
         extraColors[i] = glm::vec3(1.0f);
