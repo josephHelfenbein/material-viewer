@@ -775,12 +775,12 @@ void RenderText(unsigned int shader, unsigned int VAO, unsigned int VBO, std::st
     glBindVertexArray(0);
     glBindTexture(GL_TEXTURE_2D, 0);
 }
-std::pair<std::vector<float>, std::vector<unsigned int>> loadModel(char filePath[]){
+void loadModel(char filePath[], unsigned int &VAO, unsigned int &VBO, unsigned int &EBO, unsigned int &indexCount){
     objl::Loader loader;
     if(!loader.LoadFile(filePath)){
         std::cerr<<"Failed to load OBJ file"<<std::endl;
         error = "Failed to load OBJ file";
-        return {{},{}};
+        return;
     }
     objl::Mesh mesh = loader.LoadedMeshes[0];
     glm::vec3 minBound(FLT_MAX, FLT_MAX, FLT_MAX);
@@ -819,7 +819,22 @@ std::pair<std::vector<float>, std::vector<unsigned int>> loadModel(char filePath
         vertices.push_back(mesh.Vertices[i].Normal.Y);
         vertices.push_back(mesh.Vertices[i].Normal.Z);
     }
-    return {vertices, indices};
+    glGenVertexArrays(1, &VAO);
+    glGenBuffers(1, &VBO);
+    glGenBuffers(1, &EBO);
+    glBindVertexArray(VAO);
+    glBindBuffer(GL_ARRAY_BUFFER, VBO);
+    glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float), &vertices[0], GL_STATIC_DRAW);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(unsigned int), &indices[0], GL_STATIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
+    glEnableVertexAttribArray(2);
+    glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(5 * sizeof(float)));
+    indexCount = indices.size();
+    return;
 }
 
 char vertexLoc[] = "./src/shaders/main.vert";
@@ -898,8 +913,7 @@ unsigned int ao;
 
 int main()
 {   
-    if (!glfwInit())
-    {
+    if (!glfwInit()) {
         std::cerr << "Failed to initialize GLFW" << std::endl;
         return -1;
     }
@@ -911,8 +925,7 @@ int main()
 
     GLFWwindow* window;
     window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "Material Viewer (Alpha)", nullptr, nullptr);
-    if (window == nullptr)
-    {
+    if (window == nullptr) {
         std::cerr << "Failed to open GLFW window" << std::endl;
         glfwTerminate();
         return -1;
@@ -921,65 +934,22 @@ int main()
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
     glfwSetCursorPosCallback(window, mouseCallback);
 
-    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
-    {
+    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
         std::cerr << "Failed to initialize GLAD" << std::endl;
         return -1;
     }
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
 
-    unsigned int cubeVAO, cubeVBO, cubeEBO;
-    std::pair<std::vector<float>, std::vector<unsigned int>> loadedCube = loadModel(cubeLoc);
-    glGenVertexArrays(1, &cubeVAO);
-    glGenBuffers(1, &cubeVBO);
-    glGenBuffers(1, &cubeEBO);
-    glBindVertexArray(cubeVAO);
-    glBindBuffer(GL_ARRAY_BUFFER, cubeVBO);
-    glBufferData(GL_ARRAY_BUFFER, loadedCube.first.size() * sizeof(float), &loadedCube.first[0], GL_STATIC_DRAW);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, cubeEBO);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, loadedCube.second.size() * sizeof(unsigned int), &loadedCube.second[0], GL_STATIC_DRAW);
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
-    glEnableVertexAttribArray(2);
-    glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(5 * sizeof(float)));
+    unsigned int cubeVAO, cubeVBO, cubeEBO, cubeIndexCount;
+    loadModel(cubeLoc, cubeVAO, cubeVBO, cubeEBO, cubeIndexCount);
 
-    unsigned int sphereVAO, sphereVBO, sphereEBO;
-    std::pair<std::vector<float>, std::vector<unsigned int>> loadedSphere = loadModel(sphereLoc);
-    glGenVertexArrays(1, &sphereVAO);
-    glGenBuffers(1, &sphereVBO);
-    glGenBuffers(1, &sphereEBO);
-    glBindVertexArray(sphereVAO);
-    glBindBuffer(GL_ARRAY_BUFFER, sphereVBO);
-    glBufferData(GL_ARRAY_BUFFER, loadedSphere.first.size() * sizeof(float), &loadedSphere.first[0], GL_STATIC_DRAW);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, sphereEBO);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, loadedSphere.second.size() * sizeof(unsigned int), &loadedSphere.second[0], GL_STATIC_DRAW);
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
-    glEnableVertexAttribArray(2);
-    glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(5 * sizeof(float)));
+    unsigned int sphereVAO, sphereVBO, sphereEBO, sphereIndexCount;
+    loadModel(sphereLoc, sphereVAO, sphereVBO, sphereEBO, sphereIndexCount);
 
-    unsigned int teapotVAO, teapotVBO, teapotEBO;
-    std::pair<std::vector<float>, std::vector<unsigned int>> loadedTeapot = loadModel(teapotLoc);
-    glGenVertexArrays(1, &teapotVAO);
-    glGenBuffers(1, &teapotVBO);
-    glGenBuffers(1, &teapotEBO);
-    glBindVertexArray(teapotVAO);
-    glBindBuffer(GL_ARRAY_BUFFER, teapotVBO);
-    glBufferData(GL_ARRAY_BUFFER, loadedTeapot.first.size() * sizeof(float), &loadedTeapot.first[0], GL_STATIC_DRAW);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, teapotEBO);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, loadedTeapot.second.size() * sizeof(unsigned int), &loadedTeapot.second[0], GL_STATIC_DRAW);
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
-    glEnableVertexAttribArray(2);
-    glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(5 * sizeof(float)));
-
+    unsigned int teapotVAO, teapotVBO, teapotEBO, teapotIndexCount;
+    loadModel(teapotLoc, teapotVAO, teapotVBO, teapotEBO, teapotIndexCount);
+    
     unsigned int shaderProgram = createShader(vertexShaderSource, fragmentShaderSource);
 
     float skyVertices[] = {       
@@ -1199,11 +1169,11 @@ int main()
         glUniform1i(glGetUniformLocation(shaderProgram, "aoMap"), 8);
 
         if(shapeNum == 1)
-            glDrawElements(GL_TRIANGLES, loadedCube.second.size(), GL_UNSIGNED_INT, 0);
+            glDrawElements(GL_TRIANGLES, cubeIndexCount, GL_UNSIGNED_INT, 0);
         else if(shapeNum == 0)
-            glDrawElements(GL_TRIANGLES, loadedSphere.second.size(), GL_UNSIGNED_INT, 0);
+            glDrawElements(GL_TRIANGLES, sphereIndexCount, GL_UNSIGNED_INT, 0);
         else if(shapeNum == 2)
-            glDrawElements(GL_TRIANGLES, loadedTeapot.second.size(), GL_UNSIGNED_INT, 0);
+            glDrawElements(GL_TRIANGLES, teapotIndexCount, GL_UNSIGNED_INT, 0);
         glBindVertexArray(0);
 
         glDepthFunc(GL_LEQUAL); 
@@ -1381,8 +1351,21 @@ int main()
 
     glDeleteVertexArrays(1, &cubeVAO);
     glDeleteBuffers(1, &cubeVBO);
+    glDeleteBuffers(1, &cubeEBO);
+    glDeleteVertexArrays(1, &sphereVAO);
+    glDeleteBuffers(1, &sphereVBO);
+    glDeleteBuffers(1, &sphereEBO);
+    glDeleteVertexArrays(1, &teapotVAO);
+    glDeleteBuffers(1, &teapotVBO);
+    glDeleteBuffers(1, &teapotEBO);
     glDeleteVertexArrays(1, &skyVAO);
     glDeleteBuffers(1, &skyVBO);
+    glDeleteVertexArrays(1, &quadVAO);
+    glDeleteBuffers(1, &quadVBO);
+    glDeleteVertexArrays(1, &spriteVAO);
+    glDeleteBuffers(1, &spriteVBO);
+    glDeleteVertexArrays(1, &textVAO);
+    glDeleteBuffers(1, &textVBO);
     
     glfwTerminate();
     return 0;
