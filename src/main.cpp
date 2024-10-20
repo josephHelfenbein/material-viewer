@@ -11,6 +11,7 @@
 #include <fstream>
 #include <ft2build.h>
 #include FT_FREETYPE_H
+#include <OBJ_Loader.h>
 
 #if defined(_WIN32) || defined(__CYGWIN__)
 #include <windows.h>
@@ -774,6 +775,52 @@ void RenderText(unsigned int shader, unsigned int VAO, unsigned int VBO, std::st
     glBindVertexArray(0);
     glBindTexture(GL_TEXTURE_2D, 0);
 }
+std::pair<std::vector<float>, std::vector<unsigned int>> loadModel(char filePath[]){
+    objl::Loader loader;
+    if(!loader.LoadFile(filePath)){
+        std::cerr<<"Failed to load OBJ file"<<std::endl;
+        error = "Failed to load OBJ file";
+        return {{},{}};
+    }
+    objl::Mesh mesh = loader.LoadedMeshes[0];
+    glm::vec3 minBound(FLT_MAX, FLT_MAX, FLT_MAX);
+    glm::vec3 maxBound(-FLT_MAX, -FLT_MAX, -FLT_MAX);
+    for(int i=0; i<mesh.Vertices.size(); i++){
+        const auto& vertex = mesh.Vertices[i];
+        minBound = glm::min(minBound, glm::vec3(vertex.Position.X, vertex.Position.Y, vertex.Position.Z));
+        maxBound = glm::max(maxBound, glm::vec3(vertex.Position.X, vertex.Position.Y, vertex.Position.Z));
+    }
+    glm::vec3 center = (minBound + maxBound) * 0.5f;
+    float maxDistance = 0.0f;
+    for (const auto& vertex : mesh.Vertices) {
+        glm::vec3 vertexPos(vertex.Position.X, vertex.Position.Y, vertex.Position.Z);
+        float distance = glm::length(vertexPos - center);
+        maxDistance = std::max(maxDistance, distance);
+    }
+    glm::vec3 size = maxBound - minBound;
+    float aspectRatio = size.x / size.y;
+    float scaleFactor;
+    if(aspectRatio < 0.1f || aspectRatio > 10.0f) scaleFactor = 1.8f / maxDistance;
+    else scaleFactor = 1.8f / (maxDistance * 1.5f);
+    std::vector<float> vertices;
+    std::vector<unsigned int> indices = mesh.Indices;
+    for(int i=0; i<mesh.Vertices.size(); i++){
+        glm::vec3 scaledPosition(
+            (mesh.Vertices[i].Position.X - center.x) * scaleFactor,
+            (mesh.Vertices[i].Position.Y - center.y) * scaleFactor,
+            (mesh.Vertices[i].Position.Z - center.z) * scaleFactor
+        );
+        vertices.push_back(scaledPosition.x);
+        vertices.push_back(scaledPosition.y);
+        vertices.push_back(scaledPosition.z);
+        vertices.push_back(mesh.Vertices[i].TextureCoordinate.X);
+        vertices.push_back(mesh.Vertices[i].TextureCoordinate.Y);
+        vertices.push_back(mesh.Vertices[i].Normal.X);
+        vertices.push_back(mesh.Vertices[i].Normal.Y);
+        vertices.push_back(mesh.Vertices[i].Normal.Z);
+    }
+    return {vertices, indices};
+}
 
 char vertexLoc[] = "./src/shaders/main.vert";
 char fragmentLoc[] = "./src/shaders/main.frag";
@@ -829,9 +876,13 @@ char uiElementLocs[][30] = {
     "./src/ui/img_ui14.png",
     "./src/ui/img_ui15.png",
     "./src/ui/img_ui16.png",
-    "./src/ui/img_ui17.png"
+    "./src/ui/img_ui17.png",
+    "./src/ui/img_ui18.png"
 };
 glm::vec3 extraColors[sizeof(uiElementLocs)/30];
+char cubeLoc[] = "./src/models/cube.obj";
+char sphereLoc[] = "./src/models/sphere.obj";
+char teapotLoc[] = "./src/models/teapot.obj";
 char backgroundLoc[] = "./src/resources/background.png";
 bool highlightingUI = false;
 bool selectingEnv = false;
@@ -878,57 +929,16 @@ int main()
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
 
-    float vertices[] = {
-        // vertex position,  texture coordinate,  normal vector
-        -0.75f, -0.75f, -0.75f,  0.0f, 0.0f,  0.0f, 0.0f, -1.0f,
-         0.75f, -0.75f, -0.75f,  1.0f, 0.0f,  0.0f, 0.0f, -1.0f,
-         0.75f,  0.75f, -0.75f,  1.0f, 1.0f,  0.0f, 0.0f, -1.0f,
-         0.75f,  0.75f, -0.75f,  1.0f, 1.0f,  0.0f, 0.0f, -1.0f,
-        -0.75f,  0.75f, -0.75f,  0.0f, 1.0f,  0.0f, 0.0f, -1.0f,
-        -0.75f, -0.75f, -0.75f,  0.0f, 0.0f,  0.0f, 0.0f, -1.0f,
-
-        -0.75f, -0.75f,  0.75f,  0.0f, 0.0f,  0.0f, 0.0f, 1.0f,
-         0.75f, -0.75f,  0.75f,  1.0f, 0.0f,  0.0f, 0.0f, 1.0f,
-         0.75f,  0.75f,  0.75f,  1.0f, 1.0f,  0.0f, 0.0f, 1.0f,
-         0.75f,  0.75f,  0.75f,  1.0f, 1.0f,  0.0f, 0.0f, 1.0f,
-        -0.75f,  0.75f,  0.75f,  0.0f, 1.0f,  0.0f, 0.0f, 1.0f,
-        -0.75f, -0.75f,  0.75f,  0.0f, 0.0f,  0.0f, 0.0f, 1.0f,
-
-        -0.75f,  0.75f,  0.75f,  1.0f, 0.0f,  -1.0f, 0.0f, 0.0f,
-        -0.75f,  0.75f, -0.75f,  1.0f, 1.0f,  -1.0f, 0.0f, 0.0f,
-        -0.75f, -0.75f, -0.75f,  0.0f, 1.0f,  -1.0f, 0.0f, 0.0f,
-        -0.75f, -0.75f, -0.75f,  0.0f, 1.0f,  -1.0f, 0.0f, 0.0f,
-        -0.75f, -0.75f,  0.75f,  0.0f, 0.0f,  -1.0f, 0.0f, 0.0f,
-        -0.75f,  0.75f,  0.75f,  1.0f, 0.0f,  -1.0f, 0.0f, 0.0f,
-
-         0.75f,  0.75f,  0.75f,  1.0f, 0.0f,  1.0f, 0.0f, 0.0f,
-         0.75f,  0.75f, -0.75f,  1.0f, 1.0f,  1.0f, 0.0f, 0.0f,
-         0.75f, -0.75f, -0.75f,  0.0f, 1.0f,  1.0f, 0.0f, 0.0f,
-         0.75f, -0.75f, -0.75f,  0.0f, 1.0f,  1.0f, 0.0f, 0.0f,
-         0.75f, -0.75f,  0.75f,  0.0f, 0.0f,  1.0f, 0.0f, 0.0f,
-         0.75f,  0.75f,  0.75f,  1.0f, 0.0f,  1.0f, 0.0f, 0.0f,
-
-        -0.75f, -0.75f, -0.75f,  0.0f, 1.0f,  0.0f, -1.0f, 0.0f,
-         0.75f, -0.75f, -0.75f,  1.0f, 1.0f,  0.0f, -1.0f, 0.0f,
-         0.75f, -0.75f,  0.75f,  1.0f, 0.0f,  0.0f, -1.0f, 0.0f,
-         0.75f, -0.75f,  0.75f,  1.0f, 0.0f,  0.0f, -1.0f, 0.0f,
-        -0.75f, -0.75f,  0.75f,  0.0f, 0.0f,  0.0f, -1.0f, 0.0f,
-        -0.75f, -0.75f, -0.75f,  0.0f, 1.0f,  0.0f, -1.0f, 0.0f,
-
-        -0.75f,  0.75f, -0.75f,  0.0f, 1.0f,  0.0f, 1.0f, 0.0f,
-         0.75f,  0.75f, -0.75f,  1.0f, 1.0f,  0.0f, 1.0f, 0.0f,
-         0.75f,  0.75f,  0.75f,  1.0f, 0.0f,  0.0f, 1.0f, 0.0f,
-         0.75f,  0.75f,  0.75f,  1.0f, 0.0f,  0.0f, 1.0f, 0.0f,
-        -0.75f,  0.75f,  0.75f,  0.0f, 0.0f,  0.0f, 1.0f, 0.0f,
-        -0.75f,  0.75f, -0.75f,  0.0f, 1.0f,  0.0f, 1.0f, 0.0f
-    };
-    unsigned int VBO, VAO;
-    glGenVertexArrays(1, &VAO);
-    glGenBuffers(1, &VBO);
-    glBindVertexArray(VAO);
-
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), &vertices, GL_STATIC_DRAW);
+    unsigned int cubeVAO, cubeVBO, cubeEBO;
+    std::pair<std::vector<float>, std::vector<unsigned int>> loadedCube = loadModel(cubeLoc);
+    glGenVertexArrays(1, &cubeVAO);
+    glGenBuffers(1, &cubeVBO);
+    glGenBuffers(1, &cubeEBO);
+    glBindVertexArray(cubeVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, cubeVBO);
+    glBufferData(GL_ARRAY_BUFFER, loadedCube.first.size() * sizeof(float), &loadedCube.first[0], GL_STATIC_DRAW);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, cubeEBO);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, loadedCube.second.size() * sizeof(unsigned int), &loadedCube.second[0], GL_STATIC_DRAW);
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(1);
@@ -936,66 +946,33 @@ int main()
     glEnableVertexAttribArray(2);
     glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(5 * sizeof(float)));
 
-    unsigned int indexCount;
-    std::vector<glm::vec3> positions;
-    std::vector<glm::vec2> uv;
-    std::vector<glm::vec3> normals;
-    std::vector<unsigned int> indices;
-    const unsigned int X_SEGMENTS = 64;
-    const unsigned int Y_SEGMENTS = 64;
-    for(unsigned int x=0; x<=X_SEGMENTS; x++){
-        for(unsigned int y=0; y<=Y_SEGMENTS; y++){
-            float xSegment = (float)x / (float)X_SEGMENTS;
-            float ySegment = (float)y / (float)Y_SEGMENTS;
-            float xPos = std::cos(xSegment * 2.0 * pi) * std::sin(ySegment * pi);
-            float yPos = std::cos(ySegment * pi);
-            float zPos = std::sin(xSegment * 2.0f * pi) * std::sin(ySegment * pi);
-            positions.push_back(glm::vec3(xPos, yPos, zPos));
-            uv.push_back(glm::vec2(xSegment, ySegment));
-            normals.push_back(glm::vec3(xPos, yPos, zPos));
-        }
-    }
-    bool oddRow = false;
-    for(unsigned int y=0; y<Y_SEGMENTS; y++){
-        if(!oddRow){
-            for(unsigned int x=0; x<=X_SEGMENTS; x++){
-                indices.push_back(y * (X_SEGMENTS + 1) + x);
-                indices.push_back((y + 1) * (X_SEGMENTS + 1) + x);
-            }
-        }
-        else{
-            for(int x=X_SEGMENTS; x>=0; x--){
-                indices.push_back((y + 1) * (X_SEGMENTS + 1) + x);
-                indices.push_back(y * (X_SEGMENTS + 1) + x);
-            }
-        }
-        oddRow = !oddRow;
-    }
-    indexCount = static_cast<unsigned int>(indices.size());
-    std::vector<float> sphereVertices;
-    for(unsigned int i=0; i<positions.size(); i++){
-        sphereVertices.push_back(positions[i].x);
-        sphereVertices.push_back(positions[i].y);
-        sphereVertices.push_back(positions[i].z);
-        if(uv.size() > 0){
-            sphereVertices.push_back(uv[i].x);
-            sphereVertices.push_back(uv[i].y);
-        }
-        if(normals.size() > 0){
-            sphereVertices.push_back(normals[i].x);
-            sphereVertices.push_back(normals[i].y);
-            sphereVertices.push_back(normals[i].z);
-        }
-    }
     unsigned int sphereVAO, sphereVBO, sphereEBO;
+    std::pair<std::vector<float>, std::vector<unsigned int>> loadedSphere = loadModel(sphereLoc);
     glGenVertexArrays(1, &sphereVAO);
     glGenBuffers(1, &sphereVBO);
     glGenBuffers(1, &sphereEBO);
     glBindVertexArray(sphereVAO);
     glBindBuffer(GL_ARRAY_BUFFER, sphereVBO);
-    glBufferData(GL_ARRAY_BUFFER, sphereVertices.size() * sizeof(float), &sphereVertices[0], GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, loadedSphere.first.size() * sizeof(float), &loadedSphere.first[0], GL_STATIC_DRAW);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, sphereEBO);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(float), &indices[0], GL_STATIC_DRAW);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, loadedSphere.second.size() * sizeof(unsigned int), &loadedSphere.second[0], GL_STATIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
+    glEnableVertexAttribArray(2);
+    glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(5 * sizeof(float)));
+
+    unsigned int teapotVAO, teapotVBO, teapotEBO;
+    std::pair<std::vector<float>, std::vector<unsigned int>> loadedTeapot = loadModel(teapotLoc);
+    glGenVertexArrays(1, &teapotVAO);
+    glGenBuffers(1, &teapotVBO);
+    glGenBuffers(1, &teapotEBO);
+    glBindVertexArray(teapotVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, teapotVBO);
+    glBufferData(GL_ARRAY_BUFFER, loadedTeapot.first.size() * sizeof(float), &loadedTeapot.first[0], GL_STATIC_DRAW);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, teapotEBO);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, loadedTeapot.second.size() * sizeof(unsigned int), &loadedTeapot.second[0], GL_STATIC_DRAW);
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(1);
@@ -1137,7 +1114,7 @@ int main()
     glBindVertexArray(0);
     prepareCharacters();
 
-    bool isCube = false;
+    int shapeNum = 0;
     float tooltipTime = 0.0f;
 
     while(!glfwWindowShouldClose(window)) {
@@ -1156,7 +1133,9 @@ int main()
         }
         else if(selectingShape){
             selectingShape = false;
-            isCube = currentElement == 4;
+            if(currentElement == 4) shapeNum = 1;
+            else if(currentElement == 5) shapeNum = 0;
+            else if(currentElement == 17) shapeNum = 2;
         }
         else if(uploadingEnv){
             uploadingEnv = false;
@@ -1180,10 +1159,12 @@ int main()
 
         glUniform3fv(glGetUniformLocation(shaderProgram, "camPos"), 1, &camPos[0]);
 
-        if(isCube)
-            glBindVertexArray(VAO);
-        else
+        if(shapeNum == 1)
+            glBindVertexArray(cubeVAO);
+        else if(shapeNum == 0)
             glBindVertexArray(sphereVAO);
+        else if(shapeNum == 2)
+            glBindVertexArray(teapotVAO);
 
         glm::mat4 model = glm::mat4(1.0f);
         glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "model"), 1, GL_FALSE, &model[0][0]);
@@ -1217,10 +1198,12 @@ int main()
         glBindTexture(GL_TEXTURE_2D, ao);
         glUniform1i(glGetUniformLocation(shaderProgram, "aoMap"), 8);
 
-        if(isCube)
-            glDrawArrays(GL_TRIANGLES, 0, 36);
-        else
-            glDrawElements(GL_TRIANGLE_STRIP, indexCount, GL_UNSIGNED_INT, 0);
+        if(shapeNum == 1)
+            glDrawElements(GL_TRIANGLES, loadedCube.second.size(), GL_UNSIGNED_INT, 0);
+        else if(shapeNum == 0)
+            glDrawElements(GL_TRIANGLES, loadedSphere.second.size(), GL_UNSIGNED_INT, 0);
+        else if(shapeNum == 2)
+            glDrawElements(GL_TRIANGLES, loadedTeapot.second.size(), GL_UNSIGNED_INT, 0);
         glBindVertexArray(0);
 
         glDepthFunc(GL_LEQUAL); 
@@ -1268,8 +1251,8 @@ int main()
         glm::mat4 orthoProj = glm::ortho(0.0f, (float)SCR_WIDTH, (float)SCR_HEIGHT, 0.0f, -1.0f, 1.0f);
         glm::mat4 spriteModel = glm::mat4(1.0f);
         glUseProgram(spriteProgram);
-        spriteModel = glm::translate(spriteModel, glm::vec3(10.0f, (float)SCR_HEIGHT - 60.0f, 0.0f));
-        spriteModel = glm::scale(spriteModel, glm::vec3(50.0f, 50.0f, 1.0f));
+        spriteModel = glm::translate(spriteModel, glm::vec3(10.0f, (float)SCR_HEIGHT - 10.0f, 0.0f));
+        spriteModel = glm::scale(spriteModel, glm::vec3(50.0f, -50.0f, 1.0f));
         glUniformMatrix4fv(glGetUniformLocation(spriteProgram, "model"), 1, GL_FALSE, &spriteModel[0][0]);
         glUniformMatrix4fv(glGetUniformLocation(spriteProgram, "projection"), 1, GL_FALSE, &orthoProj[0][0]);
         glUniform3fv(glGetUniformLocation(spriteProgram, "extraColor"), 1, &extraColors[0][0]);
@@ -1298,8 +1281,8 @@ int main()
         glBindTexture(GL_TEXTURE_2D, uiElements[6]);
         glDrawArrays(GL_TRIANGLES, 0, 6);
         spriteModel = glm::mat4(1.0f);
-        spriteModel = glm::translate(spriteModel, glm::vec3((float)SCR_WIDTH - 60.0f, (float)SCR_HEIGHT - 60.0f, 0.0f));
-        spriteModel = glm::scale(spriteModel, glm::vec3(50.0f, 50.0f, 1.0f));
+        spriteModel = glm::translate(spriteModel, glm::vec3((float)SCR_WIDTH - 60.0f, (float)SCR_HEIGHT - 10.0f, 0.0f));
+        spriteModel = glm::scale(spriteModel, glm::vec3(50.0f, -50.0f, 1.0f));
         glUniformMatrix4fv(glGetUniformLocation(spriteProgram, "model"), 1, GL_FALSE, &spriteModel[0][0]);
         glUniform3fv(glGetUniformLocation(spriteProgram, "extraColor"), 1, &extraColors[4][0]);
         glBindTexture(GL_TEXTURE_2D, uiElements[4]);
@@ -1308,6 +1291,11 @@ int main()
         glUniformMatrix4fv(glGetUniformLocation(spriteProgram, "model"), 1, GL_FALSE, &spriteModel[0][0]);
         glUniform3fv(glGetUniformLocation(spriteProgram, "extraColor"), 1, &extraColors[5][0]);
         glBindTexture(GL_TEXTURE_2D, uiElements[5]);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+        spriteModel = glm::translate(spriteModel, glm::vec3(-1.0f, 0.0f, 0.0f));
+        glUniformMatrix4fv(glGetUniformLocation(spriteProgram, "model"), 1, GL_FALSE, &spriteModel[0][0]);
+        glUniform3fv(glGetUniformLocation(spriteProgram, "extraColor"), 1, &extraColors[17][0]);
+        glBindTexture(GL_TEXTURE_2D, uiElements[17]);
         glDrawArrays(GL_TRIANGLES, 0, 6);
         spriteModel = glm::translate(spriteModel, glm::vec3(-1.0f, 0.0f, 0.0f));
         glUniformMatrix4fv(glGetUniformLocation(spriteProgram, "model"), 1, GL_FALSE, &spriteModel[0][0]);
@@ -1391,8 +1379,8 @@ int main()
         glfwPollEvents();    
     }
 
-    glDeleteVertexArrays(1, &VAO);
-    glDeleteBuffers(1, &VBO);
+    glDeleteVertexArrays(1, &cubeVAO);
+    glDeleteBuffers(1, &cubeVBO);
     glDeleteVertexArrays(1, &skyVAO);
     glDeleteBuffers(1, &skyVBO);
     
@@ -1464,7 +1452,7 @@ void processInput(GLFWwindow *window){
     else if(glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS && highlightingUI){
         if(currentElement < 4)
             selectingEnv = true;
-        else if(currentElement < 6)
+        else if(currentElement < 6 || currentElement == 17)
             selectingShape = true;
         else if(currentElement == 6)
             uploadHDRI();
@@ -1542,7 +1530,8 @@ void mouseCallback(GLFWwindow* window, double xposIn, double yposIn){
             else if(xposIn > 210.0f && xposIn < 260.0f) {hoverElement(6); highlightingUI = true; tooltip = "Upload HDRI environment";}
             else if(xposIn > SCR_WIDTH - 60.0f && xposIn < SCR_WIDTH - 10.0f) {hoverElement(4); highlightingUI = true;}
             else if(xposIn > SCR_WIDTH - 110.0f && xposIn < SCR_WIDTH - 60.0f) {hoverElement(5); highlightingUI = true;}
-            else if(xposIn > SCR_WIDTH - 160.0f && xposIn < SCR_WIDTH - 110.0f) {hoverElement(7); highlightingUI = true; tooltip = "Change material";}
+            else if(xposIn > SCR_WIDTH - 160.0f && xposIn < SCR_WIDTH - 110.0f) {hoverElement(17); highlightingUI = true;}
+            else if(xposIn > SCR_WIDTH - 210.0f && xposIn < SCR_WIDTH - 160.0f) {hoverElement(7); highlightingUI = true; tooltip = "Change material";}
             else if(highlightingUI) {hoverElement(-1); highlightingUI = false;}
         }
         else if(highlightingUI) {hoverElement(-1); highlightingUI = false;}
