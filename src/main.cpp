@@ -12,6 +12,8 @@
 #include <ft2build.h>
 #include FT_FREETYPE_H
 #include <OBJ_Loader.h>
+#include <nlohmann/json.hpp>
+#include <pybind11/embed.h>
 
 #if defined(_WIN32) || defined(__CYGWIN__)
 #include <windows.h>
@@ -282,7 +284,7 @@ unsigned int loadEnv(char file[]){
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     return hdrTexture;
 }
-unsigned int loadTexture(char file[]){
+unsigned int loadTexture(const char* file){
     unsigned int textureID;
     glGenTextures(2, &textureID);
     int width, height, nrComponents;
@@ -333,44 +335,93 @@ unsigned int loadTexture(ImageData* imageData){
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     return textureID;
 }
-unsigned int* OpenZipFile(char* path){
-    char* filenames[] = {
-        (char*)"albedo.png",
-        (char*)"metalness.png",
-        (char*)"normal.png",
-        (char*)"roughness.png",
-        (char*)"ao.png",
+std::unordered_map<std::string, std::vector<float>> loadPrecomputedEmbeddings(){
+    std::ifstream file("./src/target_embeddings.json");
+    nlohmann::json j;
+    file >> j;
+    std::unordered_map<std::string, std::vector<float>> targetEmbeddings;
+    for(auto& [key, value] : j.items()){
+        targetEmbeddings[key] = value.get<std::vector<float>>();
+    }
+    return targetEmbeddings;
+}
+std::vector<float> getEmbedding(const std::string &name){
+    pybind11::scoped_interpreter guard{};
+    pybind11::module sys = pybind11::module::import("sys");
+    sys.attr("path").cast<pybind11::list>().append("./src");
+    pybind11::module pyModule = pybind11::module::import("generate_embeddings");
+    pybind11::object pyEmbedding = pyModule.attr("get_embedding_for_filename")(name);
+    std::vector<float> embedding = pyEmbedding.cast<std::vector<float>>();
+    return embedding;
+}
+float calculateSimilarity(const std::vector<float> &v1, const std::vector<float> &v2){
+    if(v1.size() != v2.size()){
+        std::cerr<<"Error with vector search, vectors are different sizes";
+        error = "Error with vector search";
+        errorTime = 0.0f;
+    }
+    float dotProduct = 0.0f;
+    float normA = 0.0f;
+    float normB = 0.0f;
+    for(size_t i=0; i<v1.size(); i++){
+        dotProduct += v1[i] * v2[i];
+        normA += v1[i] * v1[i];
+        normB += v2[i] * v2[i];
+    }
+    if(normA == 0.0f || normB == 0.0f) return 0.0f;
+    return dotProduct / (std::sqrt(normA) * std::sqrt(normB));
+}
+int matchFilenameToTexture(const std::string &filename, std::unordered_map<std::string, std::vector<float>> &targetEmbeddings){
+    const std::vector<std::string> targetFilenames = {
+        "diffuse.png", "metalness.png", "normal.png", "roughness.png", "ao.png"
     };
+    std::vector<float> filenameEmbedding = getEmbedding(filename);
+    int bestMatchIndex = -1;
+    float bestSimilarity = -1.0f;
+    for(int i=0; i<targetFilenames.size(); i++){
+        auto it = targetEmbeddings.find(targetFilenames[i]);
+        if(it == targetEmbeddings.end()) continue;
+        float similarity = calculateSimilarity(filenameEmbedding, it->second);
+        if(similarity > bestSimilarity){
+            bestMatchIndex = i;
+            bestSimilarity = similarity;
+        }
+    }
+    return bestMatchIndex;
+}
+unsigned int extractAndLoadTexture(zip* archive, const char* filename){
+    zip_file* zfile = zip_fopen(archive, filename, 0);
+    if(!zfile) return -1;
+    FILE* output = fopen(filename, "wb");
+    if(!output) {
+        zip_fclose(zfile);
+        return -1;
+    }
+    char buffer[4096];
+    int bytesRead;
+    while((bytesRead = zip_fread(zfile, buffer, sizeof(buffer))) > 0) fwrite(buffer, 1, bytesRead, output);
+    fclose(output);
+    zip_fclose(zfile);
+    unsigned int texture = loadTexture(filename);
+    remove(filename);
+    return texture;
+}
+unsigned int* OpenZipFile(char* path){
+    std::unordered_map<std::string, std::vector<float>> targetEmbeddings = loadPrecomputedEmbeddings();
     const int numTextures = 5;
     unsigned int* textures = new unsigned int[numTextures];
-    for(unsigned int i=0; i<numTextures; i++) textures[i] = -1;
+    for(int i=0; i<numTextures; i++) textures[i] = -1;
     int err = 0;
     zip* archive = zip_open(path, 0, &err);
     if(!archive) {
         return textures;
     }
-    for(unsigned int i=0; i<numTextures; i++){
-        zip_file* zfile = zip_fopen(archive, filenames[i], 0);
-        if(!zfile) {
-            error = "Could not find one or more textures.";
-            errorTime = 0.0f;
-            continue;
-        }
-        FILE* output = fopen(filenames[i], "wb");
-        if(!output){
-            error = "Could not load one or more textures";
-            errorTime = 0.0f;
-            zip_fclose(zfile);
-            continue;
-        }
-        char buffer[4096];
-        int bytesRead;
-        while((bytesRead = zip_fread(zfile, buffer, sizeof(buffer))) > 0)
-            fwrite(buffer, 1, bytesRead, output);
-        fclose(output);
-        zip_fclose(zfile);
-        textures[i] = loadTexture(filenames[i]);
-        remove(filenames[i]);
+    zip_int64_t numFiles = zip_get_num_entries(archive, 0);
+    for(zip_int64_t i=0; i<numFiles; i++){
+        const char* filename = zip_get_name(archive, i, 0);
+        if(!filename) continue;
+        int textureIndex = matchFilenameToTexture(filename, targetEmbeddings);
+        if(textureIndex>=0) textures[textureIndex] = extractAndLoadTexture(archive, filename);
     }
     zip_close(archive);
     return textures;
@@ -888,12 +939,12 @@ const char* brdfVertexShaderSource = getShaders(brdfVertexLoc);
 const char* uiVertexShaderSource = getShaders(uiVertexLoc);
 const char* uiFragmentShaderSource = getShaders(uiFragmentLoc);
 const char* textFragmentShaderSource = getShaders(textFragmentLoc);
-char defaultMatLoc[] = "./src/material/stainless_steel.mat";
-char albedoLoc[] = "./src/material/albedoNot.png";
-char aoLoc[] = "./src/material/aoNot.png";
-char metallicLoc[] = "./src/material/metallicNot.png";
-char normalLoc[] = "./src/material/normalNot.png";
-char roughnessLoc[] = "./src/material/roughnessNot.png";
+const char defaultMatLoc[] = "./src/material/stainless_steel.mat";
+const char albedoLoc[] = "./src/material/albedoNot.png";
+const char aoLoc[] = "./src/material/aoNot.png";
+const char metallicLoc[] = "./src/material/metallicNot.png";
+const char normalLoc[] = "./src/material/normalNot.png";
+const char roughnessLoc[] = "./src/material/roughnessNot.png";
 char environmentLocs[][70] = {
     "./src/environments/industrial_sunset_puresky/environment.hdr",
     "./src/environments/kloppenheim_02_puresky/environment.hdr",
@@ -901,7 +952,7 @@ char environmentLocs[][70] = {
     "./src/environments/syferfontein_1d_clear_puresky/environment.hdr"
 };
 int currentElement = 0;
-char uiElementLocs[][30] = {
+const char uiElementLocs[][30] = {
     "./src/ui/hdri_ui1.png",
     "./src/ui/hdri_ui2.png",
     "./src/ui/hdri_ui3.png",
@@ -1385,7 +1436,7 @@ void uploadHDRI(){
     }
 }
 void uploadTexture(int tex){
-    char* newTexture = OpenFileDialogTex();
+    const char* newTexture = OpenFileDialogTex();
     if(!newTexture) return;
     if(tex==0) albedo = loadTexture(newTexture);
     else if(tex==1) metallic = loadTexture(newTexture);
