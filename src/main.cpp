@@ -413,7 +413,7 @@ unsigned int createShader(const char* vertSource, const char* fragSource){
     glDeleteShader(fragmentShader);
     return shaderProgram;
 }
-std::pair<std::pair<unsigned int, unsigned int>, std::pair<unsigned int, unsigned int>> HDRItoCubemap(char environmentLoc[], unsigned int skyProgram, unsigned int irradianceProgram, unsigned int prefilterProgram, unsigned int brdfProgram, unsigned int VAO, unsigned int quadVAO){
+void HDRItoCubemap(char environmentLoc[], unsigned int skyProgram, unsigned int irradianceProgram, unsigned int prefilterProgram, unsigned int brdfProgram, unsigned int VAO, unsigned int &envCubemapSet, unsigned int &irradianceMapSet, unsigned int &prefilterMapSet, unsigned int &brdfMapSet){
     unsigned int captureFBO;
     unsigned int captureRBO;
     glGenFramebuffers(1, &captureFBO);
@@ -543,12 +543,33 @@ std::pair<std::pair<unsigned int, unsigned int>, std::pair<unsigned int, unsigne
     glViewport(0, 0, 512, 512);
     glUseProgram(brdfProgram);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    unsigned int quadVAO;
+    unsigned int quadVBO;
+    float quadVertices[] = {
+        -1.0f, 1.0f, 0.0f,  0.0f, 1.0f,
+        -1.0f, -1.0f, 0.0f,  0.0f, 0.0f,
+        1.0f, 1.0f, 0.0f,  1.0f, 1.0f,
+        1.0f, -1.0f, 0.0f,  1.0f, 0.0f,
+    };
+    glGenVertexArrays(1, &quadVAO);
+    glGenBuffers(1, &quadVBO);
+    glBindVertexArray(quadVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
     glBindVertexArray(quadVAO);
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
     glBindVertexArray(0);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
-    return {{envCubemap, irradianceMap}, {prefilterMap, brdfLUTTexture}};
+    envCubemapSet = envCubemap;
+    irradianceMapSet = irradianceMap;
+    prefilterMapSet = prefilterMap;
+    brdfMapSet = brdfLUTTexture;
+    return;
 }
 struct TextureMetadata{
     int width;
@@ -585,7 +606,7 @@ ImageData* loadTextureData(unsigned int textureID){
     glBindTexture(GL_TEXTURE_2D, 0);
     return imgData;
 }
-bool writeCustomTextureFile(const char* outputPath, unsigned int albedo, unsigned int roughness, unsigned int normal, unsigned int metalness, unsigned int ao){
+void writeCustomTextureFile(const char* outputPath, unsigned int albedo, unsigned int roughness, unsigned int normal, unsigned int metalness, unsigned int ao){
     ImageData* albedoData = loadTextureData(albedo);
     ImageData* roughnessData = loadTextureData(roughness);
     ImageData* normalData = loadTextureData(normal);
@@ -595,7 +616,7 @@ bool writeCustomTextureFile(const char* outputPath, unsigned int albedo, unsigne
         std::cerr << "Failed to load one or more texture data." << std::endl;
         error = "Failed to load one or more texture data.";
         errorTime = 0.0f;
-        return false;
+        return;
     }
     TextureMetadata albedoMeta = { albedoData->width, albedoData->height, albedoData->channels, static_cast<unsigned int>(albedoData->width * albedoData->height * albedoData->channels) };
     TextureMetadata roughnessMeta = { roughnessData->width, roughnessData->height, roughnessData->channels, static_cast<unsigned int>(roughnessData->width * roughnessData->height * roughnessData->channels) };
@@ -607,7 +628,7 @@ bool writeCustomTextureFile(const char* outputPath, unsigned int albedo, unsigne
         std::cerr << "Failed to open output file " << outputPath << std::endl;
         error = "Failed to open output file.";
         errorTime = 0.0f;
-        return false;
+        return;
     }
     long long int magicNumber = 0x4D4154455249414C;
     outputFile.write(reinterpret_cast<const char*>(&magicNumber), sizeof(magicNumber));
@@ -633,9 +654,9 @@ bool writeCustomTextureFile(const char* outputPath, unsigned int albedo, unsigne
     delete aoData;
     outputFile.close();
     std::cout << "Material file written to " << outputPath << std::endl;
-    return true;
+    return;
 }
-std::pair<std::pair<std::pair<unsigned int, unsigned int>,std::pair<unsigned int, unsigned int>>, unsigned int> readCustomTextureFile(const char* inputPath){
+void readCustomTextureFile(const char* inputPath, unsigned int &albedo, unsigned int &roughness, unsigned int &normal, unsigned int &metallic, unsigned int &ao){
     unsigned int albedoID;
     unsigned int roughnessID;
     unsigned int normalID;
@@ -646,7 +667,7 @@ std::pair<std::pair<std::pair<unsigned int, unsigned int>,std::pair<unsigned int
         std::cerr << "Failed to load material file" << std::endl;
         error = "Failed to load material file.";
         errorTime = 0.0f;
-        return {{{albedoID, roughnessID}, {normalID, metallicID}}, aoID};
+        return;
     }
     long long int magicNumber;
     inputFile.read(reinterpret_cast<char*>(&magicNumber), sizeof(magicNumber));
@@ -654,7 +675,7 @@ std::pair<std::pair<std::pair<unsigned int, unsigned int>,std::pair<unsigned int
         std::cerr << "Invalid file format" << std::endl;
         error = "Invalid file format.";
         errorTime = 0.0f;
-        return {{{albedoID, roughnessID}, {normalID, metallicID}}, aoID};
+        return;
     }
     TextureMetadata albedoMeta, roughnessMeta, normalMeta, metalnessMeta, aoMeta;
     inputFile.read(reinterpret_cast<char*>(&albedoMeta), sizeof(albedoMeta));
@@ -692,7 +713,12 @@ std::pair<std::pair<std::pair<unsigned int, unsigned int>,std::pair<unsigned int
     delete[] aoData->data;
     delete aoData;
     inputFile.close();
-    return {{{albedoID, roughnessID}, {normalID, metallicID}}, aoID};
+    albedo = albedoID;
+    roughness = roughnessID;
+    normal = normalID;
+    metallic = metallicID;
+    ao=aoID;
+    return;
 }
 struct Character{
     unsigned int textureID;
@@ -780,6 +806,7 @@ void loadModel(char filePath[], unsigned int &VAO, unsigned int &VBO, unsigned i
     if(!loader.LoadFile(filePath)){
         std::cerr<<"Failed to load OBJ file"<<std::endl;
         error = "Failed to load OBJ file";
+        errorTime = 0.0f;
         return;
     }
     objl::Mesh mesh = loader.LoadedMeshes[0];
@@ -800,8 +827,8 @@ void loadModel(char filePath[], unsigned int &VAO, unsigned int &VBO, unsigned i
     glm::vec3 size = maxBound - minBound;
     float aspectRatio = size.x / size.y;
     float scaleFactor;
-    if(aspectRatio < 0.1f || aspectRatio > 10.0f) scaleFactor = 1.8f / maxDistance;
-    else scaleFactor = 1.8f / (maxDistance * 1.5f);
+    if(aspectRatio > 1.0f) scaleFactor = 1.8f / maxDistance;
+    else scaleFactor = 1.25f / (maxDistance);
     std::vector<float> vertices;
     std::vector<unsigned int> indices = mesh.Indices;
     for(int i=0; i<mesh.Vertices.size(); i++){
@@ -1010,47 +1037,16 @@ int main(int argc, char* argv[]) {
     unsigned int prefilterShaderProgram = createShader(cubemapVertexShaderSource, prefilterFragmentShaderSource);
     unsigned int brdfShaderProgram = createShader(brdfVertexShaderSource, brdfFragmentShaderSource);
 
-    unsigned int quadVAO;
-    unsigned int quadVBO;
-    float quadVertices[] = {
-        -1.0f, 1.0f, 0.0f,  0.0f, 1.0f,
-        -1.0f, -1.0f, 0.0f,  0.0f, 0.0f,
-        1.0f, 1.0f, 0.0f,  1.0f, 1.0f,
-        1.0f, -1.0f, 0.0f,  1.0f, 0.0f,
-    };
-    glGenVertexArrays(1, &quadVAO);
-    glGenBuffers(1, &quadVBO);
-    glBindVertexArray(quadVAO);
-    glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW);
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
+    unsigned int envCubemap;
+    unsigned int irradianceMap;
+    unsigned int prefilterMap;
+    unsigned int brdfMap;
+    HDRItoCubemap(environmentLocs[currentElement], cubemapShaderProgram, irradianceShaderProgram, prefilterShaderProgram, brdfShaderProgram, skyVAO, envCubemap, irradianceMap, prefilterMap, brdfMap);
 
-    std::pair<std::pair<unsigned int, unsigned int>, std::pair<unsigned int, unsigned int>> envMaps = HDRItoCubemap(environmentLocs[currentElement], cubemapShaderProgram, irradianceShaderProgram, prefilterShaderProgram, brdfShaderProgram, skyVAO, quadVAO);
-    unsigned int envCubemap = envMaps.first.first;
-    unsigned int irradianceMap = envMaps.first.second;
-    unsigned int prefilterMap = envMaps.second.first;
-    unsigned int brdfMap = envMaps.second.second;
-
-    std::pair<std::pair<std::pair<unsigned int, unsigned int>,std::pair<unsigned int, unsigned int>>, unsigned int> defaultMat = readCustomTextureFile(defaultMatLoc);
-    albedo = defaultMat.first.first.first;
-    roughness = defaultMat.first.first.second;
-    normal = defaultMat.first.second.first;
-    metallic = defaultMat.first.second.second;
-    ao = defaultMat.second;
+    readCustomTextureFile(defaultMatLoc, albedo, roughness, normal, metallic, ao);
     if (argc > 1) {
         std::cout << "Opening file: " << argv[1] << std::endl;
-        std::pair<std::pair<std::pair<unsigned int, unsigned int>,std::pair<unsigned int, unsigned int>>, unsigned int> result = readCustomTextureFile(argv[1]);
-        if(result.first.first.first != 0){
-            albedo = result.first.first.first;
-            roughness = result.first.first.second;
-            normal = result.first.second.first;
-            metallic = result.first.second.second;
-            ao = result.second;
-        }
-        else error="Failed to read material file";
+        readCustomTextureFile(argv[1], albedo, roughness, normal, metallic, ao);
     } 
     else std::cout << "No file provided." << std::endl;
 
@@ -1107,10 +1103,8 @@ int main(int argc, char* argv[]) {
 
         if(selectingEnv){
             selectingEnv = false;
-            envMaps = HDRItoCubemap(environmentLocs[currentElement], cubemapShaderProgram, irradianceShaderProgram, prefilterShaderProgram, brdfShaderProgram, skyVAO, quadVAO);
-            envCubemap = envMaps.first.first;
-            irradianceMap = envMaps.first.second;
-            prefilterMap = envMaps.second.first;
+            unsigned int emptyBRDF;
+            HDRItoCubemap(environmentLocs[currentElement], cubemapShaderProgram, irradianceShaderProgram, prefilterShaderProgram, brdfShaderProgram, skyVAO, envCubemap, irradianceMap, prefilterMap, emptyBRDF);
             uploadedEnv = nullptr;
         }
         else if(selectingShape){
@@ -1121,10 +1115,8 @@ int main(int argc, char* argv[]) {
         }
         else if(uploadingEnv){
             uploadingEnv = false;
-            envMaps = HDRItoCubemap(uploadedEnv, cubemapShaderProgram, irradianceShaderProgram, prefilterShaderProgram, brdfShaderProgram, skyVAO, quadVAO);
-            envCubemap = envMaps.first.first;
-            irradianceMap = envMaps.first.second;
-            prefilterMap = envMaps.second.first;
+            unsigned int emptyBRDF;
+            HDRItoCubemap(uploadedEnv, cubemapShaderProgram, irradianceShaderProgram, prefilterShaderProgram, brdfShaderProgram, skyVAO, envCubemap, irradianceMap, prefilterMap, emptyBRDF);
         }
         
         glClearColor(0.1f, 0.1f, 0.2f, 1.0f);
@@ -1372,8 +1364,6 @@ int main(int argc, char* argv[]) {
     glDeleteBuffers(1, &teapotEBO);
     glDeleteVertexArrays(1, &skyVAO);
     glDeleteBuffers(1, &skyVBO);
-    glDeleteVertexArrays(1, &quadVAO);
-    glDeleteBuffers(1, &quadVBO);
     glDeleteVertexArrays(1, &spriteVAO);
     glDeleteBuffers(1, &spriteVBO);
     glDeleteVertexArrays(1, &textVAO);
@@ -1430,16 +1420,7 @@ void saveToFile(){
 }
 void uploadMat(){
     char* matPath = OpenFileDialogMaterial();
-    if(matPath){
-        std::pair<std::pair<std::pair<unsigned int, unsigned int>,std::pair<unsigned int, unsigned int>>, unsigned int> result = readCustomTextureFile(matPath);
-        if(result.first.first.first != 0){
-            albedo = result.first.first.first;
-            roughness = result.first.first.second;
-            normal = result.first.second.first;
-            metallic = result.first.second.second;
-            ao = result.second;
-        }
-    }
+    if(matPath) readCustomTextureFile(matPath, albedo, roughness, normal, metallic, ao);
 }
 void processInput(GLFWwindow *window){
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
