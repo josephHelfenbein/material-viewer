@@ -345,14 +345,26 @@ std::unordered_map<std::string, std::vector<float>> loadPrecomputedEmbeddings(){
     }
     return targetEmbeddings;
 }
+class PythonEmbedding {
+public:
+    PythonEmbedding() {
+        pybind11::initialize_interpreter();
+        pybind11::module sys = pybind11::module::import("sys");
+        sys.attr("path").cast<pybind11::list>().append("./src/");
+    }
+    ~PythonEmbedding() {pybind11::finalize_interpreter();}
+    std::vector<float> getEmbedding(const std::string &name) {
+        pybind11::module sys = pybind11::module::import("sys");
+    sys.attr("path").cast<pybind11::list>().append("./src/");
+        pybind11::module pyModule = pybind11::module::import("generate_embeddings");
+        pybind11::object pyEmbedding = pyModule.attr("get_embedding_for_filename")(name);
+        std::vector<float> embedding = pyEmbedding.cast<std::vector<float>>();
+        return embedding;
+    }
+};
+PythonEmbedding pythonEmbedding;
 std::vector<float> getEmbedding(const std::string &name){
-    pybind11::scoped_interpreter guard{};
-    pybind11::module sys = pybind11::module::import("sys");
-    sys.attr("path").cast<pybind11::list>().append("./src");
-    pybind11::module pyModule = pybind11::module::import("generate_embeddings");
-    pybind11::object pyEmbedding = pyModule.attr("get_embedding_for_filename")(name);
-    std::vector<float> embedding = pyEmbedding.cast<std::vector<float>>();
-    return embedding;
+    return pythonEmbedding.getEmbedding(name);
 }
 float calculateSimilarity(const std::vector<float> &v1, const std::vector<float> &v2){
     if(v1.size() != v2.size()){
@@ -406,7 +418,7 @@ unsigned int extractAndLoadTexture(zip* archive, const char* filename){
     remove(filename);
     return texture;
 }
-unsigned int* OpenZipFile(char* path){
+unsigned int* OpenZipFile(const char* path){
     std::unordered_map<std::string, std::vector<float>> targetEmbeddings = loadPrecomputedEmbeddings();
     const int numTextures = 5;
     unsigned int* textures = new unsigned int[numTextures];
@@ -414,12 +426,20 @@ unsigned int* OpenZipFile(char* path){
     int err = 0;
     zip* archive = zip_open(path, 0, &err);
     if(!archive) {
+        std::cerr<<"Failed to open archive."<<std::endl;
+        error = "Failed to open archive";
+        errorTime = 0.0f;
         return textures;
     }
     zip_int64_t numFiles = zip_get_num_entries(archive, 0);
     for(zip_int64_t i=0; i<numFiles; i++){
         const char* filename = zip_get_name(archive, i, 0);
-        if(!filename) continue;
+        if(!filename || strlen(filename) > 4096) {
+            std::cerr<<"Invalid filename or filename too long"<<std::endl;
+            error = "Invalid filename or filename too long";
+            errorTime = 0.0f;
+            continue;
+        }
         int textureIndex = matchFilenameToTexture(filename, targetEmbeddings);
         if(textureIndex>=0) textures[textureIndex] = extractAndLoadTexture(archive, filename);
     }

@@ -7,9 +7,9 @@ def get_embedding(filename, model):
     words = filename.split('.')
     word_embeddings = [model[word] for word in words if word in model]
     if len(word_embeddings) > 0:
-        return np.mean(word_embeddings, axis=0).tolist()
+        return np.mean(word_embeddings, axis=0).astype(float).tolist()
     else:
-        return np.zeros(model.vector_size).tolist()
+        return np.zeros(model.vector_size).astype(float).tolist()
 def get_embedding_for_filename(filename):
     return get_embedding(filename, model)
 
