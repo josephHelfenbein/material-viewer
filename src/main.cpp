@@ -242,8 +242,8 @@ std::string tooltip = "";
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void mouseCallback(GLFWwindow* window, double xpos, double ypos);
 void processInput(GLFWwindow *window);
-char* getShaders(char file[]){
-    FILE* shaderFile = fopen(file, "r");
+char* getShaders(std::string file){
+    FILE* shaderFile = fopen(file.c_str(), "r");
     if(!shaderFile) {
         std::cerr<<"Error opening shader file at "<<file<<"\n";
         error = "Error opening shader file.";
@@ -260,10 +260,10 @@ char* getShaders(char file[]){
     fclose(shaderFile);
     return shader;
 }
-unsigned int loadEnv(char file[]){
+unsigned int loadEnv(std::string file){
     stbi_set_flip_vertically_on_load(true);
     int width, height, nrComponents;
-    float* data = stbi_loadf(file, &width, &height, &nrComponents, 0);
+    float* data = stbi_loadf(file.c_str(), &width, &height, &nrComponents, 0);
     unsigned int hdrTexture;
     if(data){
         glGenTextures(1, &hdrTexture);
@@ -283,11 +283,11 @@ unsigned int loadEnv(char file[]){
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     return hdrTexture;
 }
-unsigned int loadTexture(const char* file){
+unsigned int loadTexture(std::string file){
     unsigned int textureID;
     glGenTextures(2, &textureID);
     int width, height, nrComponents;
-    unsigned char* data = stbi_load(file, &width, &height, &nrComponents, 0);
+    unsigned char* data = stbi_load(file.c_str(), &width, &height, &nrComponents, 0);
     if(data){
         GLenum format;
         if(nrComponents == 1) format = GL_RED;
@@ -414,9 +414,10 @@ unsigned int* OpenZipFile(const char* path){
     zip_close(archive);
     return textures;
 }
-unsigned int createShader(const char* vertSource, const char* fragSource){
+unsigned int createShader(std::string &vertSource, std::string &fragSource){
     unsigned int vertexShader = glCreateShader(GL_VERTEX_SHADER);
-    glShaderSource(vertexShader, 1, &vertSource, nullptr);
+    const char* vertSourceCStr = vertSource.c_str();
+    glShaderSource(vertexShader, 1, &vertSourceCStr, nullptr);
     glCompileShader(vertexShader);
     int success;
     char infoLog[512];
@@ -428,7 +429,8 @@ unsigned int createShader(const char* vertSource, const char* fragSource){
         errorTime = 0.0f;
     }
     unsigned int fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
-    glShaderSource(fragmentShader, 1, &fragSource, nullptr);
+    const char* fragShaderCStr = fragSource.c_str();
+    glShaderSource(fragmentShader, 1, &fragShaderCStr, nullptr);
     glCompileShader(fragmentShader);
     glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &success);
     if(!success){
@@ -452,7 +454,7 @@ unsigned int createShader(const char* vertSource, const char* fragSource){
     glDeleteShader(fragmentShader);
     return shaderProgram;
 }
-void HDRItoCubemap(char environmentLoc[], unsigned int skyProgram, unsigned int irradianceProgram, unsigned int prefilterProgram, unsigned int brdfProgram, unsigned int VAO, unsigned int &envCubemapSet, unsigned int &irradianceMapSet, unsigned int &prefilterMapSet, unsigned int &brdfMapSet){
+void HDRItoCubemap(std::string environmentLoc, unsigned int skyProgram, unsigned int irradianceProgram, unsigned int prefilterProgram, unsigned int brdfProgram, unsigned int VAO, unsigned int &envCubemapSet, unsigned int &irradianceMapSet, unsigned int &prefilterMapSet, unsigned int &brdfMapSet){
     unsigned int captureFBO;
     unsigned int captureRBO;
     glGenFramebuffers(1, &captureFBO);
@@ -695,7 +697,7 @@ void writeCustomTextureFile(const char* outputPath, unsigned int albedo, unsigne
     std::cout << "Material file written to " << outputPath << std::endl;
     return;
 }
-void readCustomTextureFile(const char* inputPath, unsigned int &albedo, unsigned int &roughness, unsigned int &normal, unsigned int &metallic, unsigned int &ao){
+void readCustomTextureFile(std::string inputPath, unsigned int &albedo, unsigned int &roughness, unsigned int &normal, unsigned int &metallic, unsigned int &ao){
     unsigned int albedoID;
     unsigned int roughnessID;
     unsigned int normalID;
@@ -759,6 +761,13 @@ void readCustomTextureFile(const char* inputPath, unsigned int &albedo, unsigned
     ao=aoID;
     return;
 }
+std::string getAppPath(const char* relativePath){
+    const char* appdir = std::getenv("APPDIR");
+    std::string pathBuffer;
+    if (appdir) pathBuffer = std::string(appdir) + "/" + relativePath;
+    else pathBuffer = std::string("./src/") + relativePath;
+    return pathBuffer;
+}
 struct Character{
     unsigned int textureID;
     glm::ivec2 size;
@@ -776,7 +785,7 @@ void prepareCharacters(){
         return;
     }
     FT_Face face;
-    if(FT_New_Face(ft, "./src/resources/Roboto-Regular.ttf", 0, &face)){
+    if(FT_New_Face(ft, getAppPath("/resources/Roboto-Regular.ttf").c_str(), 0, &face)){
         std::cerr<<"Could not load font"<<std::endl;
         error = "Could not load font.";
         errorTime = 0.0f;
@@ -840,9 +849,9 @@ void RenderText(unsigned int shader, unsigned int VAO, unsigned int VBO, std::st
     glBindVertexArray(0);
     glBindTexture(GL_TEXTURE_2D, 0);
 }
-void loadModel(char filePath[], unsigned int &VAO, unsigned int &VBO, unsigned int &EBO, unsigned int &indexCount){
+void loadModel(std::string filePath, unsigned int &VAO, unsigned int &VBO, unsigned int &EBO, unsigned int &indexCount){
     objl::Loader loader;
-    if(!loader.LoadFile(filePath)){
+    if(!loader.LoadFile(filePath.c_str())){
         std::cerr<<"Failed to load OBJ file"<<std::endl;
         error = "Failed to load OBJ file";
         errorTime = 0.0f;
@@ -903,68 +912,68 @@ void loadModel(char filePath[], unsigned int &VAO, unsigned int &VBO, unsigned i
     return;
 }
 
-char vertexLoc[] = "./src/shaders/main.vert";
-char fragmentLoc[] = "./src/shaders/main.frag";
-char skyFragmentLoc[] = "./src/shaders/sky.frag";
-char cubemapVertexLoc[] = "./src/shaders/cubemap.vert";
-char cubemapFragmentLoc[] = "./src/shaders/cubemap.frag";
-char irradianceFragmentLoc[] = "./src/shaders/irradiance.frag";
-char prefilterFragmentLoc[] = "./src/shaders/prefilter.frag";
-char brdfFragmentLoc[] = "./src/shaders/brdf.frag";
-char brdfVertexLoc[] = "./src/shaders/brdf.vert";
-char uiVertexLoc[] = "./src/shaders/ui.vert";
-char uiFragmentLoc[] = "./src/shaders/ui.frag";
-char textFragmentLoc[] = "./src/shaders/text.frag";
-const char* vertexShaderSource = getShaders(vertexLoc);
-const char* fragmentShaderSource = getShaders(fragmentLoc);
-const char* skyFragmentShaderSource = getShaders(skyFragmentLoc);
-const char* cubemapVertexShaderSource = getShaders(cubemapVertexLoc);
-const char* cubemapFragmentShaderSource = getShaders(cubemapFragmentLoc);
-const char* irradianceFragmentShaderSource = getShaders(irradianceFragmentLoc);
-const char* prefilterFragmentShaderSource = getShaders(prefilterFragmentLoc);
-const char* brdfFragmentShaderSource = getShaders(brdfFragmentLoc);
-const char* brdfVertexShaderSource = getShaders(brdfVertexLoc);
-const char* uiVertexShaderSource = getShaders(uiVertexLoc);
-const char* uiFragmentShaderSource = getShaders(uiFragmentLoc);
-const char* textFragmentShaderSource = getShaders(textFragmentLoc);
-const char defaultMatLoc[] = "./src/material/stainless_steel.mat";
-const char albedoLoc[] = "./src/material/albedoNot.png";
-const char aoLoc[] = "./src/material/aoNot.png";
-const char metallicLoc[] = "./src/material/metallicNot.png";
-const char normalLoc[] = "./src/material/normalNot.png";
-const char roughnessLoc[] = "./src/material/roughnessNot.png";
-char environmentLocs[][70] = {
-    "./src/environments/industrial_sunset_puresky/environment.hdr",
-    "./src/environments/kloppenheim_02_puresky/environment.hdr",
-    "./src/environments/snowy_forest/environment.hdr",
-    "./src/environments/syferfontein_1d_clear_puresky/environment.hdr"
+std::string vertexLoc = getAppPath("/shaders/main.vert");
+std::string fragmentLoc = getAppPath("/shaders/main.frag");
+std::string skyFragmentLoc = getAppPath("/shaders/sky.frag");
+std::string cubemapVertexLoc = getAppPath("/shaders/cubemap.vert");
+std::string cubemapFragmentLoc = getAppPath("/shaders/cubemap.frag");
+std::string irradianceFragmentLoc = getAppPath("/shaders/irradiance.frag");
+std::string prefilterFragmentLoc = getAppPath("/shaders/prefilter.frag");
+std::string brdfFragmentLoc = getAppPath("/shaders/brdf.frag");
+std::string brdfVertexLoc = getAppPath("/shaders/brdf.vert");
+std::string uiVertexLoc = getAppPath("/shaders/ui.vert");
+std::string uiFragmentLoc = getAppPath("/shaders/ui.frag");
+std::string textFragmentLoc = getAppPath("/shaders/text.frag");
+std::string vertexShaderSource = getShaders(vertexLoc);
+std::string fragmentShaderSource = getShaders(fragmentLoc);
+std::string skyFragmentShaderSource = getShaders(skyFragmentLoc);
+std::string cubemapVertexShaderSource = getShaders(cubemapVertexLoc);
+std::string cubemapFragmentShaderSource = getShaders(cubemapFragmentLoc);
+std::string irradianceFragmentShaderSource = getShaders(irradianceFragmentLoc);
+std::string prefilterFragmentShaderSource = getShaders(prefilterFragmentLoc);
+std::string brdfFragmentShaderSource = getShaders(brdfFragmentLoc);
+std::string brdfVertexShaderSource = getShaders(brdfVertexLoc);
+std::string uiVertexShaderSource = getShaders(uiVertexLoc);
+std::string uiFragmentShaderSource = getShaders(uiFragmentLoc);
+std::string textFragmentShaderSource = getShaders(textFragmentLoc);
+std::string defaultMatLoc = getAppPath("/material/stainless_steel.mat");
+std::string albedoLoc = getAppPath("/material/albedoNot.png");
+std::string aoLoc = getAppPath("/material/aoNot.png");
+std::string metallicLoc = getAppPath("/material/metallicNot.png");
+std::string normalLoc = getAppPath("/material/normalNot.png");
+std::string roughnessLoc = getAppPath("/material/roughnessNot.png");
+std::string environmentLocs[] = {
+    getAppPath("/environments/industrial_sunset_puresky/environment.hdr"),
+    getAppPath("/environments/kloppenheim_02_puresky/environment.hdr"),
+    getAppPath("/environments/snowy_forest/environment.hdr"),
+    getAppPath("/environments/syferfontein_1d_clear_puresky/environment.hdr")
 };
 int currentElement = 0;
-const char uiElementLocs[][30] = {
-    "./src/ui/hdri_ui1.png",
-    "./src/ui/hdri_ui2.png",
-    "./src/ui/hdri_ui3.png",
-    "./src/ui/hdri_ui4.png",
-    "./src/ui/hdri_ui5.png",
-    "./src/ui/hdri_ui6.png",
-    "./src/ui/hdri_ui7.png",
-    "./src/ui/hdri_ui8.png",
-    "./src/ui/hdri_ui9.png",
-    "./src/ui/img_ui10.png",
-    "./src/ui/img_ui11.png",
-    "./src/ui/img_ui12.png",
-    "./src/ui/img_ui13.png",
-    "./src/ui/img_ui14.png",
-    "./src/ui/img_ui15.png",
-    "./src/ui/img_ui16.png",
-    "./src/ui/img_ui17.png",
-    "./src/ui/img_ui18.png"
+std::string uiElementLocs[] = {
+    getAppPath("/ui/hdri_ui1.png"),
+    getAppPath("/ui/hdri_ui2.png"),
+    getAppPath("/ui/hdri_ui3.png"),
+    getAppPath("/ui/hdri_ui4.png"),
+    getAppPath("/ui/hdri_ui5.png"),
+    getAppPath("/ui/hdri_ui6.png"),
+    getAppPath("/ui/hdri_ui7.png"),
+    getAppPath("/ui/hdri_ui8.png"),
+    getAppPath("/ui/hdri_ui9.png"),
+    getAppPath("/ui/img_ui10.png"),
+    getAppPath("/ui/img_ui11.png"),
+    getAppPath("/ui/img_ui12.png"),
+    getAppPath("/ui/img_ui13.png"),
+    getAppPath("/ui/img_ui14.png"),
+    getAppPath("/ui/img_ui15.png"),
+    getAppPath("/ui/img_ui16.png"),
+    getAppPath("/ui/img_ui17.png"),
+    getAppPath("/ui/img_ui18.png")
 };
-glm::vec3 extraColors[sizeof(uiElementLocs)/30];
-char cubeLoc[] = "./src/models/cube.obj";
-char sphereLoc[] = "./src/models/sphere.obj";
-char teapotLoc[] = "./src/models/teapot.obj";
-char backgroundLoc[] = "./src/resources/background.png";
+glm::vec3 extraColors[sizeof(uiElementLocs)/32];
+std::string cubeLoc = getAppPath("/models/cube.obj");
+std::string sphereLoc = getAppPath("/models/sphere.obj");
+std::string teapotLoc = getAppPath("/models/teapot.obj");
+std::string backgroundLoc = getAppPath("/resources/background.png");
 bool highlightingUI = false;
 bool selectingEnv = false;
 bool selectingShape = false;
@@ -1092,8 +1101,8 @@ int main(int argc, char* argv[]) {
     for(unsigned int i=0; i<sizeof(extraColors) / 12; i++){
         extraColors[i] = glm::vec3(1.0f);
     }
-    unsigned int uiElements[sizeof(uiElementLocs)/30] = {};
-    for(unsigned int i=0; i<sizeof(uiElementLocs)/30; i++){
+    unsigned int uiElements[sizeof(uiElementLocs)/32] = {};
+    for(unsigned int i=0; i<sizeof(uiElementLocs)/32; i++){
         uiElements[i] = loadTexture(uiElementLocs[i]);
     }
     unsigned int uiBackground = loadTexture(backgroundLoc);
