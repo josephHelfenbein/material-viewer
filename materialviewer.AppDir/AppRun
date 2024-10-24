@@ -1,0 +1,4 @@
+#!/bin/bash
+cd "$(dirname "$0")"
+HERE="$(dirname "$(readlink -f "${0}")")"
+exec "${HERE}/usr/bin/materialviewer" "$@"
