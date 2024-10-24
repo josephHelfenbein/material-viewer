@@ -334,6 +334,18 @@ unsigned int loadTexture(ImageData* imageData){
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     return textureID;
 }
+int levenshteinDistance(const std::string &s1, const std::string &s2){
+    std::vector<std::vector<int>> d(s1.size()+1, std::vector<int>(s2.size()+1));
+    for(size_t i=0; i<=s1.size(); i++) d[i][0] = i;
+    for(size_t i=0; i<=s2.size(); i++) d[0][i] = i;
+    for(size_t i=1; i<=s1.size(); i++){
+        for(size_t j=1; j<=s2.size(); j++){
+            if (s1[i - 1] == s2[j - 1]) d[i][j] = d[i - 1][j - 1];
+            else d[i][j] = std::min({ d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + 1 });
+        }
+    }
+    return d[s1.size()][s2.size()];
+}
 unsigned int* OpenZipFile(const char* path){
     const int numTextures = 5;
     unsigned int* textures = new unsigned int[numTextures];
@@ -345,6 +357,59 @@ unsigned int* OpenZipFile(const char* path){
         error = "Failed to open archive";
         errorTime = 0.0f;
         return textures;
+    }
+    else{
+        std::unordered_map<std::string, int> textureMap = {
+            {"albedo", 0}, {"diffuse", 0}, {"col", 0}, {"color", 0},
+            {"metallic", 1}, {"metalness", 1},
+            {"normal", 2}, {"nrm", 2}, {"bump", 2},
+            {"roughness", 3}, {"rough", 3},
+            {"ao", 4}, {"ambientocclusion", 4}
+        };
+        zip_int64_t numFiles = zip_get_num_entries(archive, 0);
+        for(zip_int64_t i=0; i<numFiles; i++){
+            const char* filename = zip_get_name(archive, i, 0);
+            if(!filename || strlen(filename) > 4096){
+                std::cerr<<"Error opening file in zip"<<std::endl;
+                error = "Error opening file in zip";
+                errorTime = 0.0f;
+                continue;
+            }
+            std::string fileNameStr = filename;
+            int bestMatchIndex = -1;
+            int bestMatchDistance = INT_MAX;
+            for(const auto& entry : textureMap){
+                int distance = levenshteinDistance(fileNameStr, entry.first);
+                if(distance < bestMatchDistance){
+                    bestMatchDistance = distance;
+                    bestMatchIndex = entry.second;
+                }
+            }
+            if(bestMatchIndex != -1 && textures[bestMatchIndex] == -1) {
+                zip_file* zfile = zip_fopen_index(archive, i, 0);
+                if(!zfile){
+                    std::cerr<<"Failed to find file in archive"<<std::endl;
+                    error = "Failed to find file in archive";
+                    errorTime = 0.0f;
+                    continue;
+                }
+                FILE* output = fopen(filename, "wb");
+                if(!output){
+                    std::cerr<<"Failed to open file in archive"<<std::endl;
+                    error = "Failed to open file in archive";
+                    errorTime = 0.0f;
+                    continue;
+                }
+                char buffer[4096];
+                int bytesRead;
+                while((bytesRead = zip_fread(zfile, buffer, sizeof(buffer))) > 0)
+                    fwrite(buffer, 1, bytesRead, output);
+                fclose(output);
+                zip_fclose(zfile);
+                textures[bestMatchIndex] = loadTexture(filename);
+                remove(filename);
+            }
+        }
     }
     zip_close(archive);
     return textures;

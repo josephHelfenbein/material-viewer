@@ -24,8 +24,7 @@
                 "/usr/include/qt",
                 "/usr/include/qt/QtWidgets",
                 "/usr/include/qt/QtGui",
-                "/usr/include/qt/QtCore",
-                "/usr/include/python3.12"
+                "/usr/include/qt/QtCore"
             ],
             "defines": [
                 "_DEBUG",
