@@ -862,8 +862,8 @@ void readCustomTextureFile(std::string inputPath, unsigned int &albedo, unsigned
 std::string getAppPath(const char* relativePath){
     const char* appdir = std::getenv("APPDIR");
     std::string pathBuffer;
-    if (appdir) pathBuffer = std::string(appdir) + "/" + relativePath;
-    else pathBuffer = std::string("./src/") + relativePath;
+    if (appdir) pathBuffer = std::string(appdir) + std::string("/src") + relativePath;
+    else pathBuffer = std::string("./src") + relativePath;
     return pathBuffer;
 }
 struct Character{
