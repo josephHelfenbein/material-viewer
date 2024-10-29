@@ -7,6 +7,8 @@
 #include <vector>
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include <stb_image_write.h>
 #include <zip.h>
 #include <fstream>
 #include <ft2build.h>
@@ -123,6 +125,36 @@ char* SaveMatFileDialog(){
         return nullptr;
     }
 }
+char* SaveZipFileDialog(){
+    static char filePath[256];
+    char currentDir[256];
+    _getcwd(currentDir, sizeof(currentDir));
+    OPENFILENAMEA ofn;
+    ZeroMemory(&ofn, sizeof(ofn));
+    ofn.lStructSize = sizeof(ofn);
+    ofn.hwndOwner = nullptr;
+    ofn.lpstrFile = filePath;
+    ofn.lpstrFile[0] = '\0';
+    ofn.nMaxFile = sizeof(filePath);
+    ofn.lpstrFilter = "Zip Files (*.zip)\0*.zip\0All Files (*.*)\0*.*\0";
+    ofn.nFilterIndex = 1;
+    ofn.lpstrFileTitle = nullptr;
+    ofn.nMaxFileTitle = 0;
+    ofn.lpstrInitialDir = nullptr;
+    ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_OVERWRITEPROMPT | OFN_HIDEREADONLY;
+    snprintf(filePath, sizeof(filePath), "textures.zip");
+    if(GetSaveFileNameA(&ofn)){
+        std::string fileStr(filePath);
+        if(fileStr.find(".zip") == std::string::npos)
+            fileStr += ".zip";
+        _chdir(currentDir);
+        return _strdup(fileStr.c_str());
+    }
+    else {
+        _chdir(currentDir);
+        return nullptr;
+    }
+}
 char* OpenFileDialogMaterial(){
     static char filePath[256];
     char currentDir[256];
@@ -203,6 +235,23 @@ char* SaveMatFileDialog(){
         std::string fileStr = filename.toStdString();
         if(fileStr.find(".mat") == std::string::npos)
             fileStr += ".mat";
+        snprintf(filePath, sizeof(filePath), "%s", filename.toStdString().c_str());
+        return filePath;
+    }
+    else return nullptr;
+}
+char* SaveZipFileDialog(){
+    static char filePath[256];
+    int argc = 0;
+    char* argv[] = {nullptr};
+    QApplication app(argc, argv);
+    QApplication::setApplicationName("Material Viewer");
+    QString defaultFileName = "textures.zip";
+    QString filename = QFileDialog::getSaveFileName(nullptr, "Save Zip File", defaultFileName, "Zip Files (*.zip);;All Files (*.*)");
+    if(!filename.isEmpty()){
+        std::string fileStr = filename.toStdString();
+        if(fileStr.find(".zip") == std::string::npos)
+            fileStr += ".zip";
         snprintf(filePath, sizeof(filePath), "%s", filename.toStdString().c_str());
         return filePath;
     }
@@ -647,6 +696,55 @@ ImageData* loadTextureData(unsigned int textureID){
     glBindTexture(GL_TEXTURE_2D, 0);
     return imgData;
 }
+void saveTexturesToZip(const char* path, unsigned int albedo, unsigned int roughness, unsigned int normal, unsigned int metallic, unsigned int ao){
+    int errorTemp;
+    zip_t* zip = zip_open(path, ZIP_CREATE | ZIP_TRUNCATE, &errorTemp);
+    if(!zip){
+        std::cerr<<"Couldn't save zip file"<<std::endl;
+        error = "Couldn't save zip file";
+        errorTime = 0.0f;
+        return;
+    }
+    ImageData* albedoData = loadTextureData(albedo);
+    ImageData* roughnessData = loadTextureData(roughness);
+    ImageData* normalData = loadTextureData(normal);
+    ImageData* metalnessData = loadTextureData(metallic);
+    ImageData* aoData = loadTextureData(ao);
+    if (!albedoData || !roughnessData || !normalData || !metalnessData || !aoData) {
+        std::cerr << "Failed to load one or more texture data." << std::endl;
+        error = "Failed to load one or more texture data.";
+        errorTime = 0.0f;
+        return;
+    }
+    auto addTextureToZip = [&](ImageData* texture, const std::string& filename){
+        int pngSize;
+        unsigned char* pngData = stbi_write_png_to_mem(texture->data, texture->width * texture->channels, texture->width, texture->height, texture->channels, &pngSize);
+        if(!pngData){
+            zip_discard(zip);
+            std::cerr<<"Couldn't save png to memory"<<std::endl;
+            error = "Couldn't save png to memory";
+            errorTime = 0.0f;
+            return;
+        }
+        zip_source_t* source = zip_source_buffer(zip, pngData, pngSize, 1);
+        if(!source || zip_file_add(zip, filename.c_str(), source, ZIP_FL_OVERWRITE) < 0){
+            zip_source_free(source);
+            zip_discard(zip);
+            std::cerr<<"Couldn't add png to zip file"<<std::endl;
+            error = "Couldn't add png to zip file";
+            errorTime = 0.0f;
+            return;
+        }
+        return;
+    };
+    addTextureToZip(albedoData, "albedo.png");
+    addTextureToZip(roughnessData, "roughness.png");
+    addTextureToZip(normalData, "normal.png");
+    addTextureToZip(metalnessData, "metallic.png");
+    addTextureToZip(aoData, "ao.png");
+    zip_close(zip);
+    return;
+}
 void writeCustomTextureFile(const char* outputPath, unsigned int albedo, unsigned int roughness, unsigned int normal, unsigned int metalness, unsigned int ao){
     ImageData* albedoData = loadTextureData(albedo);
     ImageData* roughnessData = loadTextureData(roughness);
@@ -967,7 +1065,8 @@ std::string uiElementLocs[] = {
     getAppPath("/ui/img_ui15.png"),
     getAppPath("/ui/img_ui16.png"),
     getAppPath("/ui/img_ui17.png"),
-    getAppPath("/ui/img_ui18.png")
+    getAppPath("/ui/img_ui18.png"),
+    getAppPath("/ui/img_ui19.png")
 };
 glm::vec3 extraColors[sizeof(uiElementLocs)/32];
 std::string cubeLoc = getAppPath("/models/cube.obj");
@@ -1385,6 +1484,11 @@ int main(int argc, char* argv[]) {
             glUniform3fv(glGetUniformLocation(spriteProgram, "extraColor"), 1, &extraColors[16][0]);
             glBindTexture(GL_TEXTURE_2D, uiElements[16]);
             glDrawArrays(GL_TRIANGLES, 0, 6);
+            spriteModel = glm::translate(spriteModel, glm::vec3(0.0f, -1.1f, 0.0f));
+            glUniformMatrix4fv(glGetUniformLocation(spriteProgram, "model"), 1, GL_FALSE, &spriteModel[0][0]);
+            glUniform3fv(glGetUniformLocation(spriteProgram, "extraColor"), 1, &extraColors[18][0]);
+            glBindTexture(GL_TEXTURE_2D, uiElements[18]);
+            glDrawArrays(GL_TRIANGLES, 0, 6);
             spriteModel = glm::mat4(1.0f);
             spriteModel = glm::translate(spriteModel, glm::vec3((float)SCR_WIDTH * 0.085f, (float)SCR_HEIGHT * 0.95f, 0.0f));
             spriteModel = glm::scale(spriteModel, glm::vec3((float)SCR_WIDTH / 1.2f, -(float)SCR_HEIGHT / 1.2f, 1.0f));
@@ -1470,6 +1574,12 @@ void uploadMat(){
     char* matPath = OpenFileDialogMaterial();
     if(matPath) readCustomTextureFile(matPath, albedo, roughness, normal, metallic, ao);
 }
+void downloadTextures(){
+    char* zipPath = SaveZipFileDialog();
+    if(zipPath){
+        saveTexturesToZip(zipPath, albedo, roughness, normal, metallic, ao);
+    }
+}
 void processInput(GLFWwindow *window){
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);
@@ -1492,6 +1602,8 @@ void processInput(GLFWwindow *window){
             saveToFile();
         else if(currentElement == 16)
             uploadMat();
+        else if(currentElement == 18)
+            downloadTextures();
     }
 }
 void hoverElement(int elementNum){
@@ -1525,6 +1637,9 @@ void mouseCallback(GLFWwindow* window, double xposIn, double yposIn){
             }
             else if(yposIn < SCR_HEIGHT / 4.0f + 205.0f && yposIn > SCR_HEIGHT / 4.0f + 155.0f && xposIn > SCR_WIDTH * 3.0f / 4.0f - 60.0f && xposIn < SCR_WIDTH * 3.0f / 4.0f - 10.0f){
                 hoverElement(16); highlightingUI = true; tooltip = "Upload .mat";
+            }
+            else if(yposIn < SCR_HEIGHT / 4.0f + 260.0f && yposIn > SCR_HEIGHT / 4.0f + 210.0f && xposIn > SCR_WIDTH * 3.0f / 4.0f - 60.0f && xposIn < SCR_WIDTH * 3.0f / 4.0f - 10.0f){
+                hoverElement(18); highlightingUI = true; tooltip = "Download textures";
             }
             else if(xposIn > SCR_WIDTH / 4.0f + 20.0f && xposIn < SCR_WIDTH / 4.0f + 70.0f){
                 if(yposIn > SCR_HEIGHT / 4.0f + 20.0f && yposIn < SCR_HEIGHT / 4.0f + 70.0f) {
