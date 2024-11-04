@@ -18,6 +18,8 @@
 #include <mutex>
 #include <thread>
 #include <zstd.h>
+#include <unordered_map>
+#include <algorithm>
 
 #if defined(_WIN32) || defined(__CYGWIN__)
 #include <windows.h>
