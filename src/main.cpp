@@ -17,6 +17,7 @@
 #include <map>
 #include <mutex>
 #include <thread>
+#include <zstd.h>
 
 #if defined(_WIN32) || defined(__CYGWIN__)
 #include <windows.h>
@@ -790,11 +791,25 @@ void writeCustomTextureFile(const char* outputPath, unsigned int albedo, unsigne
     outputFile.write(reinterpret_cast<const char*>(&normalMeta), sizeof(normalMeta));
     outputFile.write(reinterpret_cast<const char*>(&metalnessMeta), sizeof(metalnessMeta));
     outputFile.write(reinterpret_cast<const char*>(&aoMeta), sizeof(aoMeta));
-    outputFile.write(reinterpret_cast<const char*>(albedoData->data), albedoMeta.dataSize);
-    outputFile.write(reinterpret_cast<const char*>(roughnessData->data), roughnessMeta.dataSize);
-    outputFile.write(reinterpret_cast<const char*>(normalData->data), normalMeta.dataSize);
-    outputFile.write(reinterpret_cast<const char*>(metalnessData->data), metalnessMeta.dataSize);
-    outputFile.write(reinterpret_cast<const char*>(aoData->data), aoMeta.dataSize);
+    auto compressWriteTexture = [&outputFile](ImageData* imageData){
+        size_t originalSize = imageData->width * imageData->height * imageData->channels;
+        size_t compressedBound = ZSTD_compressBound(originalSize);
+        std::vector<unsigned char> compressedData(compressedBound);
+        size_t compressedSize = ZSTD_compress(compressedData.data(), compressedBound, imageData->data, originalSize, 1);
+        if(ZSTD_isError(compressedSize)){
+            std::cerr<<"Compression error: "<<ZSTD_getErrorName(compressedSize)<<std::endl;
+            error = "Error compressing textures";
+            errorTime = 0.0f;
+            return;
+        }
+        outputFile.write(reinterpret_cast<const char*>(&compressedSize), sizeof(compressedSize));
+        outputFile.write(reinterpret_cast<const char*>(compressedData.data()), compressedSize);
+    };
+    compressWriteTexture(albedoData);
+    compressWriteTexture(roughnessData);
+    compressWriteTexture(normalData);
+    compressWriteTexture(metalnessData);
+    compressWriteTexture(aoData);
     delete[] albedoData->data;
     delete albedoData;
     delete[] roughnessData->data;
@@ -837,12 +852,25 @@ void readCustomTextureFile(std::string inputPath, unsigned int &albedo, unsigned
     inputFile.read(reinterpret_cast<char*>(&metalnessMeta), sizeof(metalnessMeta));
     inputFile.read(reinterpret_cast<char*>(&aoMeta), sizeof(aoMeta));
     auto loadTextureFromStream = [&inputFile](const TextureMetadata& meta) -> ImageData* {
+        size_t compressedSize;
+        inputFile.read(reinterpret_cast<char*>(&compressedSize), sizeof(compressedSize));
+        std::vector<unsigned char> compressedData(compressedSize);
+        inputFile.read(reinterpret_cast<char*>(compressedData.data()), compressedSize);
+        size_t decompressedSize = meta.width * meta.height * meta.channels;
         ImageData* imageData = new ImageData();
         imageData->width = meta.width;
         imageData->height = meta.height;
         imageData->channels = meta.channels;
-        imageData->data = new unsigned char[meta.dataSize];
-        inputFile.read(reinterpret_cast<char*>(imageData->data), meta.dataSize);
+        imageData->data = new unsigned char[decompressedSize];
+        size_t actualDecompressedSize = ZSTD_decompress(imageData->data, decompressedSize, compressedData.data(), compressedSize);
+        if (ZSTD_isError(actualDecompressedSize)) {
+            std::cerr << "Decompression error: " << ZSTD_getErrorName(actualDecompressedSize) << std::endl;
+            error = "Error decompressing textures";
+            errorTime = 0.0f;
+            delete[] imageData->data;
+            delete imageData;
+            return nullptr;
+        }
         return imageData;
     };
     ImageData* albedoData = loadTextureFromStream(albedoMeta);
