@@ -15,6 +15,8 @@
 #include FT_FREETYPE_H
 #include <OBJ_Loader.h>
 #include <map>
+#include <mutex>
+#include <thread>
 
 #if defined(_WIN32) || defined(__CYGWIN__)
 #include <windows.h>
@@ -696,6 +698,7 @@ ImageData* loadTextureData(unsigned int textureID){
     glBindTexture(GL_TEXTURE_2D, 0);
     return imgData;
 }
+std::mutex zipMutex;
 void saveTexturesToZip(const char* path, unsigned int albedo, unsigned int roughness, unsigned int normal, unsigned int metallic, unsigned int ao){
     int errorTemp;
     zip_t* zip = zip_open(path, ZIP_CREATE | ZIP_TRUNCATE, &errorTemp);
@@ -714,34 +717,45 @@ void saveTexturesToZip(const char* path, unsigned int albedo, unsigned int rough
         std::cerr << "Failed to load one or more texture data." << std::endl;
         error = "Failed to load one or more texture data.";
         errorTime = 0.0f;
+        zip_discard(zip);
         return;
     }
-    auto addTextureToZip = [&](ImageData* texture, const std::string& filename){
+    std::vector<std::pair<std::string, std::vector<unsigned char>>> dataBuffer;
+    auto processTexture = [&](ImageData* texture, const std::string& filename) {
         int pngSize;
         unsigned char* pngData = stbi_write_png_to_mem(texture->data, texture->width * texture->channels, texture->width, texture->height, texture->channels, &pngSize);
-        if(!pngData){
-            zip_discard(zip);
+        if (!pngData) {
             std::cerr<<"Couldn't save png to memory"<<std::endl;
             error = "Couldn't save png to memory";
             errorTime = 0.0f;
             return;
         }
-        zip_source_t* source = zip_source_buffer(zip, pngData, pngSize, 1);
-        if(!source || zip_file_add(zip, filename.c_str(), source, ZIP_FL_OVERWRITE) < 0){
+        std::lock_guard<std::mutex> lock(zipMutex);
+        dataBuffer.emplace_back(filename, std::vector<unsigned char>(pngData, pngData + pngSize));
+        stbi_image_free(pngData);
+    };
+    std::thread t1(processTexture, albedoData, "albedo.png");
+    std::thread t2(processTexture, roughnessData, "roughness.png");
+    std::thread t3(processTexture, normalData, "normal.png");
+    std::thread t4(processTexture, metalnessData, "metallic.png");
+    std::thread t5(processTexture, aoData, "ao.png");
+    t1.join();
+    t2.join();
+    t3.join();
+    t4.join();
+    t5.join();
+    for(const auto& [filename, pngData] : dataBuffer) {
+        int pngSize = sizeof(pngData);
+        zip_source_t* source = zip_source_buffer(zip, pngData.data(), pngData.size(), 0);
+        if (!source || zip_file_add(zip, filename.c_str(), source, ZIP_FL_OVERWRITE) < 0) {
             zip_source_free(source);
             zip_discard(zip);
-            std::cerr<<"Couldn't add png to zip file"<<std::endl;
-            error = "Couldn't add png to zip file";
+            std::cerr << "Couldn't add PNG to zip file"<<std::endl;
+            error = "Couldn't add PNG to zip file";
             errorTime = 0.0f;
             return;
         }
-        return;
-    };
-    addTextureToZip(albedoData, "albedo.png");
-    addTextureToZip(roughnessData, "roughness.png");
-    addTextureToZip(normalData, "normal.png");
-    addTextureToZip(metalnessData, "metallic.png");
-    addTextureToZip(aoData, "ao.png");
+    }
     zip_close(zip);
     return;
 }
