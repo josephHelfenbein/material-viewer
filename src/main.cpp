@@ -19,6 +19,7 @@
 #include <thread>
 #include <zstd.h>
 #include <unordered_map>
+#include <regex>
 #include <algorithm>
 
 #if defined(_WIN32) || defined(__CYGWIN__)
@@ -903,11 +904,28 @@ void readCustomTextureFile(std::string inputPath, unsigned int &albedo, unsigned
     ao=aoID;
     return;
 }
+std::string replaceSlashes(const std::string& path) {
+    std::regex slashRegex("/");
+    return std::regex_replace(path, slashRegex, "\\");
+}
 std::string getAppPath(const char* relativePath){
-    const char* appdir = std::getenv("APPDIR");
     std::string pathBuffer;
-    if (appdir) pathBuffer = std::string(appdir) + std::string("/src") + relativePath;
-    else pathBuffer = std::string("./src") + relativePath;
+    std::string relativePathStr(relativePath); 
+#if defined(_WIN32) || defined(__CYGWIN__)
+    char path[MAX_PATH];
+    GetModuleFileNameA(NULL, path, MAX_PATH);
+    std::string exeDir(path);
+    exeDir = exeDir.substr(0, exeDir.find_last_of("\\/"));
+    std::string modifiedRelativePath = replaceSlashes(relativePathStr);
+    if (exeDir.find("build") != std::string::npos) {
+        pathBuffer = exeDir.substr(0, exeDir.find_last_of("\\/")) + "\\src" + replaceSlashes(relativePathStr);
+    } 
+    else pathBuffer = exeDir + "\\src" + replaceSlashes(relativePathStr);
+#else
+    const char* appdir = std::getenv("APPDIR");
+    if (appdir) pathBuffer = std::string(appdir) + std::string("/src") + relativePathStr;
+    else pathBuffer = std::string("./src") + relativePathStr;
+#endif
     return pathBuffer;
 }
 struct Character{

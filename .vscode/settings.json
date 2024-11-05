@@ -104,6 +104,9 @@
         "*.ipp": "cpp",
         "hash_map": "cpp",
         "hash_set": "cpp",
-        "__hash_table": "cpp"
+        "__hash_table": "cpp",
+        "filesystem": "cpp",
+        "xtree": "cpp",
+        "regex": "cpp"
     }
 }
