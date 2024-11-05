@@ -54,6 +54,8 @@
   <summary>Table of Contents</summary>
   <ol>
     <li><a href="#about-the-project">About The Project</a></li>
+    <li><a href="#installation">Installation</a></li>
+    <li><a href="#prerequisites">Prerequisites</a></li>
     <li><a href="#license">License</a></li>
     <li><a href="#acknowledgments">Acknowledgments</a></li>
   </ol>
@@ -80,6 +82,64 @@ A 3D desktop application to preview PBR materials made using OpenGL and C++. Fea
 
 See the [open issues](https://github.com/josephHelfenbein/material-viewer/issues) for a full list of proposed features (and known issues).
 
+## Installation
+
+To install **Material Viewer**, download the appropriate file from the [Releases](https://github.com/josephHelfenbein/material-viewer/releases) tab based on your operating system.
+
+### Windows
+
+1. **Binary**: Download `MaterialViewer.exe` and run it directly. No installation required.
+2. **Installer**: Download `MaterialViewerInstaller.exe` and follow the setup wizard for a guided installation.
+
+### Linux
+
+1. **Binary (AppImage)**:
+    - Download `MaterialViewer-x86_64.AppImage`.
+    - Make it executable:
+   ```bash
+   chmod +x MaterialViewer-x86_64.AppImage
+   ```
+    - Run the AppImage directly:
+   ```bash
+   ./MaterialViewer-x86_64.AppImage
+   ```
+2. **Installer**:
+    - Download `MaterialViewerLinuxInstall.zip` and extract it.
+    - Run the installation script:
+   ```bash
+   unzip MaterialViewerLinuxInstall.zip
+   cd MaterialViewerLinuxInstall
+   ./install.sh
+   ```
+     
+
+## Prerequisites
+
+### Windows
+
+To compile the project on Windows, you'll need:
+1. **MSYS2** - Install [MSYS2](https://www.msys2.org/) and set up the `ucrt64` environment for access to the necessary libraries and compiler.
+    - Ensure `g++` is available at `C:\msys64\ucrt64\bin\g++.exe`.
+2. **Libraries** - Install the following libraries using the MSYS2 package manager:
+    - `libzip` (for handling zip archives)
+    - `zstd` (for Zstandard compression)
+    - `freetype` (for font rendering)
+    - `glfw` (for creating windows, OpenGL contexts)
+3. Run the `Windows Debug (g++ exe)` configuration in VSCode.
+
+### Linux
+
+To compile the project on Linux, you'll need:
+1. **G++** - Install the `g++` compiler, version supporting at least C++ 17.
+2. **Libraries** - Use your package manager to install:
+    - `libzip` (for handling zip archives)
+    - `libzstd-dev` (for Zstandard compression)
+    - `libfreetype6-dev` (for font rendering)
+    - `libglfw3-dev` (for creating windows, OpenGL contexts)
+    - `qtbase5-dev` (for Qt core libraries)
+    - `qt5-qmake` (for compiling Qt applications)
+    - `libqt5widgets5`, `libqt5gui5`, `libqt5core5a` (for UI elements)
+3. Run the `Linux Debug (g++)` configuration in VSCode.
 
 <!-- LICENSE -->
 ## License
