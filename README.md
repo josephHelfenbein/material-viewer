@@ -105,11 +105,11 @@ To install **Material Viewer**, download the appropriate file from the [Releases
    ```
 2. **Installer**:
     - Download `MaterialViewerLinuxInstall.zip` and extract it.
-    - Run the installation script:
+    - Run the installation script as root:
    ```bash
    unzip MaterialViewerLinuxInstall.zip
    cd MaterialViewerLinuxInstall
-   ./install.sh
+   sudo ./install.sh
    ```
      
 
