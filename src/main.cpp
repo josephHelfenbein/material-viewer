@@ -509,7 +509,7 @@ unsigned int createShader(std::string &vertSource, std::string &fragSource){
     glDeleteShader(fragmentShader);
     return shaderProgram;
 }
-void HDRItoCubemap(std::string environmentLoc, unsigned int skyProgram, unsigned int irradianceProgram, unsigned int prefilterProgram, unsigned int brdfProgram, unsigned int VAO, unsigned int &envCubemapSet, unsigned int &irradianceMapSet, unsigned int &prefilterMapSet, unsigned int &brdfMapSet){
+void HDRItoCubemap(std::string environmentLoc, unsigned int skyProgram, unsigned int irradianceProgram, unsigned int prefilterProgram, unsigned int VAO, unsigned int &envCubemapSet, unsigned int &irradianceMapSet, unsigned int &prefilterMapSet){
     unsigned int captureFBO;
     unsigned int captureRBO;
     glGenFramebuffers(1, &captureFBO);
@@ -545,7 +545,6 @@ void HDRItoCubemap(std::string environmentLoc, unsigned int skyProgram, unsigned
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, hdrTexture);
     glViewport(0, 0, 512, 512);
-    glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
     for(unsigned int i=0; i<6; i++){
         glUniformMatrix4fv(glGetUniformLocation(skyProgram, "view"), 1, GL_FALSE, &captureViews[i][0][0]);
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, envCubemap, 0);
@@ -554,7 +553,6 @@ void HDRItoCubemap(std::string environmentLoc, unsigned int skyProgram, unsigned
         glDrawArrays(GL_TRIANGLES, 0, 36);
         glBindVertexArray(0);
     }
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glBindTexture(GL_TEXTURE_CUBE_MAP, envCubemap);
     glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
     unsigned int irradianceMap;
@@ -568,7 +566,6 @@ void HDRItoCubemap(std::string environmentLoc, unsigned int skyProgram, unsigned
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
     glBindRenderbuffer(GL_RENDERBUFFER, captureRBO);
     glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, 32, 32);
     glUseProgram(irradianceProgram);
@@ -577,7 +574,6 @@ void HDRItoCubemap(std::string environmentLoc, unsigned int skyProgram, unsigned
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_CUBE_MAP, envCubemap);
     glViewport(0, 0, 32, 32);
-    glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
     for(unsigned int i=0; i<6; i++){
         glUniformMatrix4fv(glGetUniformLocation(irradianceProgram, "view"), 1, GL_FALSE, &captureViews[i][0][0]);
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, irradianceMap, 0);
@@ -586,7 +582,6 @@ void HDRItoCubemap(std::string environmentLoc, unsigned int skyProgram, unsigned
         glDrawArrays(GL_TRIANGLES, 0, 36);
         glBindVertexArray(0);
     }
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
     unsigned int prefilterMap;
     glGenTextures(1, &prefilterMap);
     glBindTexture(GL_TEXTURE_CUBE_MAP, prefilterMap);
@@ -604,7 +599,6 @@ void HDRItoCubemap(std::string environmentLoc, unsigned int skyProgram, unsigned
     glUniformMatrix4fv(glGetUniformLocation(prefilterProgram, "projection"), 1, GL_FALSE, &captureProj[0][0]);
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_CUBE_MAP, envCubemap);
-    glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
     unsigned int maxMipLevels = 5;
     for(unsigned int mip = 0; mip<maxMipLevels; mip++){
         unsigned int mipWidth = static_cast<unsigned int>(128 * std::pow(0.5, mip));
@@ -623,6 +617,22 @@ void HDRItoCubemap(std::string environmentLoc, unsigned int skyProgram, unsigned
             glBindVertexArray(0);
         }
     }
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
+    envCubemapSet = envCubemap;
+    irradianceMapSet = irradianceMap;
+    prefilterMapSet = prefilterMap;
+    return;
+}
+void GetBRDFLUTTexture(unsigned int brdfProgram, unsigned int &brdfMapSet){
+    unsigned int captureFBO;
+    unsigned int captureRBO;
+    glGenFramebuffers(1, &captureFBO);
+    glGenRenderbuffers(1, &captureRBO);
+    glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
+    glBindRenderbuffer(GL_RENDERBUFFER, captureRBO);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, 512, 512);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, captureRBO);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     unsigned int brdfLUTTexture;
     glGenTextures(1, &brdfLUTTexture);
@@ -661,9 +671,6 @@ void HDRItoCubemap(std::string environmentLoc, unsigned int skyProgram, unsigned
     glBindVertexArray(0);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
-    envCubemapSet = envCubemap;
-    irradianceMapSet = irradianceMap;
-    prefilterMapSet = prefilterMap;
     brdfMapSet = brdfLUTTexture;
     return;
 }
@@ -1250,7 +1257,8 @@ int main(int argc, char* argv[]) {
     unsigned int irradianceMap;
     unsigned int prefilterMap;
     unsigned int brdfMap;
-    HDRItoCubemap(environmentLocs[currentElement], cubemapShaderProgram, irradianceShaderProgram, prefilterShaderProgram, brdfShaderProgram, skyVAO, envCubemap, irradianceMap, prefilterMap, brdfMap);
+    HDRItoCubemap(environmentLocs[currentElement], cubemapShaderProgram, irradianceShaderProgram, prefilterShaderProgram, skyVAO, envCubemap, irradianceMap, prefilterMap);
+    GetBRDFLUTTexture(brdfShaderProgram, brdfMap);
 
     readCustomTextureFile(defaultMatLoc, albedo, roughness, normal, metallic, ao);
     if (argc > 1) {
@@ -1312,8 +1320,7 @@ int main(int argc, char* argv[]) {
 
         if(selectingEnv){
             selectingEnv = false;
-            unsigned int emptyBRDF;
-            HDRItoCubemap(environmentLocs[currentElement], cubemapShaderProgram, irradianceShaderProgram, prefilterShaderProgram, brdfShaderProgram, skyVAO, envCubemap, irradianceMap, prefilterMap, emptyBRDF);
+            HDRItoCubemap(environmentLocs[currentElement], cubemapShaderProgram, irradianceShaderProgram, prefilterShaderProgram, skyVAO, envCubemap, irradianceMap, prefilterMap);
             uploadedEnv = nullptr;
         }
         else if(selectingShape){
@@ -1324,8 +1331,7 @@ int main(int argc, char* argv[]) {
         }
         else if(uploadingEnv){
             uploadingEnv = false;
-            unsigned int emptyBRDF;
-            HDRItoCubemap(uploadedEnv, cubemapShaderProgram, irradianceShaderProgram, prefilterShaderProgram, brdfShaderProgram, skyVAO, envCubemap, irradianceMap, prefilterMap, emptyBRDF);
+            HDRItoCubemap(uploadedEnv, cubemapShaderProgram, irradianceShaderProgram, prefilterShaderProgram, skyVAO, envCubemap, irradianceMap, prefilterMap);
         }
         
         glClearColor(0.1f, 0.1f, 0.2f, 1.0f);
