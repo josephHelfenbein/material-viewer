@@ -19,8 +19,10 @@
 #include <thread>
 #include <zstd.h>
 #include <unordered_map>
+#include <unordered_set>
 #include <regex>
 #include <algorithm>
+#include <cstdlib>
 
 #if defined(_WIN32) || defined(__CYGWIN__)
 #include <windows.h>
@@ -340,7 +342,7 @@ unsigned int loadEnv(std::string file){
 }
 unsigned int loadTexture(std::string file){
     unsigned int textureID;
-    glGenTextures(2, &textureID);
+    glGenTextures(1, &textureID);
     int width, height, nrComponents;
     unsigned char* data = stbi_load(file.c_str(), &width, &height, &nrComponents, 0);
     if(data){
@@ -389,17 +391,119 @@ unsigned int loadTexture(ImageData* imageData){
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     return textureID;
 }
-int levenshteinDistance(const std::string &s1, const std::string &s2){
-    std::vector<std::vector<int>> d(s1.size()+1, std::vector<int>(s2.size()+1));
-    for(size_t i=0; i<=s1.size(); i++) d[i][0] = i;
-    for(size_t i=0; i<=s2.size(); i++) d[0][i] = i;
-    for(size_t i=1; i<=s1.size(); i++){
-        for(size_t j=1; j<=s2.size(); j++){
-            if (s1[i - 1] == s2[j - 1]) d[i][j] = d[i - 1][j - 1];
-            else d[i][j] = std::min({ d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + 1 });
+std::string normalizeString(const std::string &str) {
+    std::string normalized;
+    for (char c : str) {
+        if (std::isalnum(static_cast<unsigned char>(c))) normalized += std::tolower(static_cast<unsigned char>(c));
+        else normalized += ' ';
+    }
+    static const std::unordered_set<std::string> irrelevant = {"3k", "4k", "2k", "/"};
+    std::istringstream iss(normalized);
+    std::string token, result;
+    while (iss >> token) {
+        if (irrelevant.count(token) == 0) result += token + " ";
+    }
+    if(!result.empty()) result.pop_back();
+    return result;
+}
+std::vector<std::string> generateNgrams(const std::string &str, int n){
+    std::vector<std::string> ngrams;
+    if(str.size()<n) {
+        ngrams.push_back(str);
+        return ngrams;
+    }
+    for(size_t i=0; i<=str.size()-n; i++){
+        ngrams.push_back(str.substr(i,n));
+    }
+    return ngrams;
+}
+double computeCosineSimilarity(const std::vector<std::string> &vec1, const std::vector<std::string> &vec2){
+    std::unordered_map<std::string, int> freq1, freq2;
+    for(const auto &gram : vec1) freq1[gram]++;
+    for(const auto &gram : vec2) freq2[gram]++;
+    double dot = 0.0, mag1 = 0.0, mag2 = 0.0;
+    for(const auto &[gram, count1] : freq1){
+        if(freq2.count(gram)) dot += count1 * freq1[gram];
+        mag1 += count1 * count1;
+    }
+    for(const auto &[gram, count2] : freq2){
+        mag2 += count2 * count2;
+    }
+    if (mag1 == 0 || mag2 == 0) return 0.0;
+    return dot / (std::sqrt(mag1) * std::sqrt(mag2));
+}
+void matchTextures(const std::vector<std::string> &filenames, const std::unordered_map<std::string, int> &textureMap, zip* archive, int numTextures, std::vector<int> &textures){
+    int numFiles = filenames.size();
+    std::vector<std::vector<double>> probabilities(numFiles, std::vector<double>(numTextures, 0.0));
+    for (int i = 0; i < numFiles; i++) {
+        std::string normalizedFilename = normalizeString(filenames[i]);
+        for (const auto &[keyword, slot] : textureMap) {
+            std::string normalizedKeyword = normalizeString(keyword);
+            auto filenameNgrams = generateNgrams(normalizedFilename, 3);
+            auto keywordNgrams = generateNgrams(normalizedKeyword, 3);
+            probabilities[i][slot] = computeCosineSimilarity(filenameNgrams, keywordNgrams);
         }
     }
-    return d[s1.size()][s2.size()];
+    std::vector<bool> assignedSlots(numTextures, false);
+    std::vector<bool> assignedFiles(numFiles, false);
+
+    while (true) {
+        double maxProbability = 0.0;
+        int bestFile = -1;
+        int bestSlot = -1;
+
+        for (int i = 0; i < numFiles; i++) {
+            if (assignedFiles[i]) continue;
+            for (int j = 0; j < numTextures; j++) {
+                if (assignedSlots[j]) continue;
+                if (probabilities[i][j] > maxProbability) {
+                    maxProbability = probabilities[i][j];
+                    bestFile = i;
+                    bestSlot = j;
+                }
+            }
+        }
+        if (bestFile == -1 || bestSlot == -1 || maxProbability < 0.1) break; 
+        zip_file* zfile = zip_fopen(archive, filenames[bestFile].c_str(), ZIP_FL_UNCHANGED);
+        if(!zfile){
+            std::cerr << "Failed to open file in zip: " << filenames[bestFile] << std::endl;
+            assignedFiles[bestFile] = true;
+            continue;
+        }
+        std::string tempFilename = filenames[bestFile];
+        std::replace(tempFilename.begin(), tempFilename.end(), '/', '_');
+        std::ofstream outFile(tempFilename.c_str(), std::ios::binary);
+        if (!outFile) {
+            std::cerr << "Failed to create temporary file: " << tempFilename << std::endl;
+            zip_fclose(zfile);
+            assignedFiles[bestFile] = true;
+            continue;
+        }
+        char buffer[4096];
+        int bytesRead;
+        while ((bytesRead = zip_fread(zfile, buffer, sizeof(buffer))) > 0) {
+            outFile.write(buffer, bytesRead);
+        }
+        zip_fclose(zfile);
+        outFile.close();
+        textures[bestSlot] = loadTexture(tempFilename);
+        remove(tempFilename.c_str());
+        assignedFiles[bestFile] = true;
+        assignedSlots[bestSlot] = true;
+        for (int i = 0; i < numFiles; i++) {
+            if (assignedFiles[i]) continue;
+            double sum = 0.0;
+            for (int j = 0; j < numTextures; j++) {
+                if (assignedSlots[j]) continue;
+                sum += probabilities[i][j];
+            }
+            if (sum > 0) {
+                for (int j = 0; j < numTextures; j++) {
+                    if (!assignedSlots[j]) probabilities[i][j] /= sum;
+                }
+            }
+        }
+    }
 }
 unsigned int* OpenZipFile(const char* path){
     const int numTextures = 5;
@@ -416,54 +520,28 @@ unsigned int* OpenZipFile(const char* path){
     else{
         std::unordered_map<std::string, int> textureMap = {
             {"albedo", 0}, {"diffuse", 0}, {"col", 0}, {"color", 0},
-            {"metallic", 1}, {"metalness", 1},
+            {"metallic", 1}, {"metalness", 1}, {"metal", 1},
             {"normal", 2}, {"nrm", 2}, {"bump", 2},
             {"roughness", 3}, {"rough", 3},
-            {"ao", 4}, {"ambientocclusion", 4}
+            {"ao", 4}, {"ambientocclusion", 4}, {"ambient", 4}, {"occlusion", 4}
         };
         zip_int64_t numFiles = zip_get_num_entries(archive, 0);
+        std::vector<std::string> filenames;
         for(zip_int64_t i=0; i<numFiles; i++){
             const char* filename = zip_get_name(archive, i, 0);
-            if(!filename || strlen(filename) > 4096){
+            if(!filename){
                 std::cerr<<"Error opening file in zip"<<std::endl;
                 error = "Error opening file in zip";
                 errorTime = 0.0f;
                 continue;
             }
-            std::string fileNameStr = filename;
-            int bestMatchIndex = -1;
-            int bestMatchDistance = INT_MAX;
-            for(const auto& entry : textureMap){
-                int distance = levenshteinDistance(fileNameStr, entry.first);
-                if(distance < bestMatchDistance){
-                    bestMatchDistance = distance;
-                    bestMatchIndex = entry.second;
-                }
-            }
-            if(bestMatchIndex != -1 && textures[bestMatchIndex] == -1) {
-                zip_file* zfile = zip_fopen_index(archive, i, 0);
-                if(!zfile){
-                    std::cerr<<"Failed to find file in archive"<<std::endl;
-                    error = "Failed to find file in archive";
-                    errorTime = 0.0f;
-                    continue;
-                }
-                FILE* output = fopen(filename, "wb");
-                if(!output){
-                    std::cerr<<"Failed to open file in archive"<<std::endl;
-                    error = "Failed to open file in archive";
-                    errorTime = 0.0f;
-                    continue;
-                }
-                char buffer[4096];
-                int bytesRead;
-                while((bytesRead = zip_fread(zfile, buffer, sizeof(buffer))) > 0)
-                    fwrite(buffer, 1, bytesRead, output);
-                fclose(output);
-                zip_fclose(zfile);
-                textures[bestMatchIndex] = loadTexture(filename);
-                remove(filename);
-            }
+            filenames.emplace_back(filename);
+        }
+        std::vector<int> matchedTextures(numTextures, -1);
+
+        matchTextures(filenames, textureMap, archive, numTextures, matchedTextures);
+        for (int i = 0; i < numTextures; i++) {
+            textures[i] = matchedTextures[i];
         }
     }
     zip_close(archive);
