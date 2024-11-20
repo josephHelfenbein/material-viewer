@@ -391,6 +391,30 @@ unsigned int loadTexture(ImageData* imageData){
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     return textureID;
 }
+std::string replaceSlashes(const std::string& path) {
+    std::regex slashRegex("/");
+    return std::regex_replace(path, slashRegex, "\\");
+}
+std::string getAppPath(const char* relativePath){
+    std::string pathBuffer;
+    std::string relativePathStr(relativePath); 
+#if defined(_WIN32) || defined(__CYGWIN__)
+    char path[MAX_PATH];
+    GetModuleFileNameA(NULL, path, MAX_PATH);
+    std::string exeDir(path);
+    exeDir = exeDir.substr(0, exeDir.find_last_of("\\/"));
+    std::string modifiedRelativePath = replaceSlashes(relativePathStr);
+    if (exeDir.find("build") != std::string::npos) {
+        pathBuffer = exeDir.substr(0, exeDir.find_last_of("\\/")) + "\\src" + replaceSlashes(relativePathStr);
+    } 
+    else pathBuffer = exeDir + "\\src" + replaceSlashes(relativePathStr);
+#else
+    const char* appdir = std::getenv("APPDIR");
+    if (appdir) pathBuffer = std::string(appdir) + std::string("/src") + relativePathStr;
+    else pathBuffer = std::string("./src") + relativePathStr;
+#endif
+    return pathBuffer;
+}
 std::string normalizeString(const std::string &str) {
     std::string normalized;
     for (char c : str) {
@@ -472,6 +496,11 @@ void matchTextures(const std::vector<std::string> &filenames, const std::unorder
         }
         std::string tempFilename = filenames[bestFile];
         std::replace(tempFilename.begin(), tempFilename.end(), '/', '_');
+        #if defined(_WIN32) || defined(__CYGWIN__)
+        #else
+        const char* tempDir = std::getenv("TMPDIR") ? std::getenv("TMPDIR") : "/tmp/";
+        tempFilename = std::string(tempDir) + "/" + tempFilename;
+        #endif
         std::ofstream outFile(tempFilename.c_str(), std::ios::binary);
         if (!outFile) {
             std::cerr << "Failed to create temporary file: " << tempFilename << std::endl;
@@ -988,30 +1017,6 @@ void readCustomTextureFile(std::string inputPath, unsigned int &albedo, unsigned
     metallic = metallicID;
     ao=aoID;
     return;
-}
-std::string replaceSlashes(const std::string& path) {
-    std::regex slashRegex("/");
-    return std::regex_replace(path, slashRegex, "\\");
-}
-std::string getAppPath(const char* relativePath){
-    std::string pathBuffer;
-    std::string relativePathStr(relativePath); 
-#if defined(_WIN32) || defined(__CYGWIN__)
-    char path[MAX_PATH];
-    GetModuleFileNameA(NULL, path, MAX_PATH);
-    std::string exeDir(path);
-    exeDir = exeDir.substr(0, exeDir.find_last_of("\\/"));
-    std::string modifiedRelativePath = replaceSlashes(relativePathStr);
-    if (exeDir.find("build") != std::string::npos) {
-        pathBuffer = exeDir.substr(0, exeDir.find_last_of("\\/")) + "\\src" + replaceSlashes(relativePathStr);
-    } 
-    else pathBuffer = exeDir + "\\src" + replaceSlashes(relativePathStr);
-#else
-    const char* appdir = std::getenv("APPDIR");
-    if (appdir) pathBuffer = std::string(appdir) + std::string("/src") + relativePathStr;
-    else pathBuffer = std::string("./src") + relativePathStr;
-#endif
-    return pathBuffer;
 }
 struct Character{
     unsigned int textureID;
