@@ -1780,6 +1780,10 @@ void processInput(GLFWwindow *window){
             uploadMat();
         else if(currentElement == 18)
             downloadTextures();
+        else if(currentElement == 19)
+            isMetallic = true;
+        else if(currentElement == 20)
+            isMetallic = false;
     }
 }
 void hoverElement(int elementNum){
@@ -1816,6 +1820,13 @@ void mouseCallback(GLFWwindow* window, double xposIn, double yposIn){
             }
             else if(yposIn < SCR_HEIGHT / 4.0f + 260.0f && yposIn > SCR_HEIGHT / 4.0f + 210.0f && xposIn > SCR_WIDTH * 3.0f / 4.0f - 60.0f && xposIn < SCR_WIDTH * 3.0f / 4.0f - 10.0f){
                 hoverElement(18); highlightingUI = true; tooltip = "Download textures";
+            }
+            //(float)SCR_WIDTH * 2.25f / 4.0f - 50.0, (float)SCR_HEIGHT * 3.5f / 4.0f - 30.0f
+            else if(yposIn > SCR_HEIGHT * 3.5f / 4.0f - 75.0f && yposIn < SCR_HEIGHT * 3.5 / 4.0f - 25.0f && xposIn > SCR_WIDTH * 2.25f / 4.0f - 50.0f && xposIn < SCR_WIDTH * 2.25f / 4.0f + 50.0f){
+                hoverElement(19); highlightingUI = true; tooltip = "Use metallic workflow";
+            }
+            else if(yposIn > SCR_HEIGHT * 3.5f / 4.0f - 75.0f && yposIn < SCR_HEIGHT * 3.5 / 4.0f - 25.0f && xposIn > SCR_WIDTH * 2.25f / 4.0f + 50.0f && xposIn < SCR_WIDTH * 2.25f / 4.0f + 150.0f){
+                hoverElement(20); highlightingUI = true; tooltip = "Use specular workflow";
             }
             else if(xposIn > SCR_WIDTH / 4.0f + 20.0f && xposIn < SCR_WIDTH / 4.0f + 70.0f){
                 if(yposIn > SCR_HEIGHT / 4.0f + 20.0f && yposIn < SCR_HEIGHT / 4.0f + 70.0f) {
