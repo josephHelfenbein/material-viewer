@@ -1218,7 +1218,9 @@ std::string uiElementLocs[] = {
     getAppPath("/ui/img_ui16.png"),
     getAppPath("/ui/img_ui17.png"),
     getAppPath("/ui/img_ui18.png"),
-    getAppPath("/ui/img_ui19.png")
+    getAppPath("/ui/img_ui19.png"),
+    getAppPath("/ui/img_ui20.png"),
+    getAppPath("/ui/img_ui21.png"),
 };
 glm::vec3 extraColors[sizeof(uiElementLocs)/32];
 std::string cubeLoc = getAppPath("/models/cube.obj");
@@ -1231,6 +1233,7 @@ bool selectingShape = false;
 bool uploadingEnv = false;
 char* uploadedEnv = nullptr;
 bool showMaterialUI = false;
+bool isMetallic = true;
 unsigned int albedo;
 unsigned int metallic;
 unsigned int normal;
@@ -1604,10 +1607,18 @@ int main(int argc, char* argv[]) {
             glBindTexture(GL_TEXTURE_2D, ao);
             glDrawArrays(GL_TRIANGLES, 0, 6);
             RenderText(textProgram, textVAO, textVBO, "Base Color", (float)SCR_WIDTH / 4.0f + 80.0f, (float)SCR_HEIGHT * 3.0f / 4.0f - 50.0f, 0.4f, glm::vec3(0.8f, 0.8f, 0.8f) * extraColors[9]);
-            RenderText(textProgram, textVAO, textVBO, "Metalness", (float)SCR_WIDTH / 4.0f + 80.0f, (float)SCR_HEIGHT * 3.0f / 4.0f - 110.0f, 0.4f, glm::vec3(0.8f, 0.8f, 0.8f) * extraColors[10]);
+            if(isMetallic){
+                RenderText(textProgram, textVAO, textVBO, "Metalness", (float)SCR_WIDTH / 4.0f + 80.0f, (float)SCR_HEIGHT * 3.0f / 4.0f - 110.0f, 0.4f, glm::vec3(0.8f, 0.8f, 0.8f) * extraColors[10]);
+                RenderText(textProgram, textVAO, textVBO, "Roughness", (float)SCR_WIDTH / 4.0f + 80.0f, (float)SCR_HEIGHT * 3.0f / 4.0f - 230.0f, 0.4f, glm::vec3(0.8f, 0.8f, 0.8f) * extraColors[12]);
+            }
+            else{
+                RenderText(textProgram, textVAO, textVBO, "Specular", (float)SCR_WIDTH / 4.0f + 80.0f, (float)SCR_HEIGHT * 3.0f / 4.0f - 110.0f, 0.4f, glm::vec3(0.8f, 0.8f, 0.8f) * extraColors[10]);
+                RenderText(textProgram, textVAO, textVBO, "Glossiness", (float)SCR_WIDTH / 4.0f + 80.0f, (float)SCR_HEIGHT * 3.0f / 4.0f - 230.0f, 0.4f, glm::vec3(0.8f, 0.8f, 0.8f) * extraColors[12]);
+            }
             RenderText(textProgram, textVAO, textVBO, "Normal Map", (float)SCR_WIDTH / 4.0f + 80.0f, (float)SCR_HEIGHT * 3.0f / 4.0f - 170.0f, 0.4f, glm::vec3(0.8f, 0.8f, 0.8f) * extraColors[11]);
-            RenderText(textProgram, textVAO, textVBO, "Roughness", (float)SCR_WIDTH / 4.0f + 80.0f, (float)SCR_HEIGHT * 3.0f / 4.0f - 230.0f, 0.4f, glm::vec3(0.8f, 0.8f, 0.8f) * extraColors[12]);
             RenderText(textProgram, textVAO, textVBO, "Ambient Occlusion", (float)SCR_WIDTH / 4.0f + 80.0f, (float)SCR_HEIGHT * 3.0f / 4.0f - 290.0f, 0.4f, glm::vec3(0.8f, 0.8f, 0.8f) * extraColors[13]);
+            RenderText(textProgram, textVAO, textVBO, "Metallic", (float)SCR_WIDTH * 2.25f / 4.0f - 25.0f, (float)SCR_HEIGHT * 0.5f / 4.0f + 45.0f, 0.3f, glm::vec3(0.8f, 0.8f, 0.8f) * extraColors[19]);
+            RenderText(textProgram, textVAO, textVBO, "Specular", (float)SCR_WIDTH * 2.25f / 4.0f + 75.0f, (float)SCR_HEIGHT * 0.5f / 4.0f + 45.0f, 0.3f, glm::vec3(0.8f, 0.8f, 0.8f) * extraColors[20]);
             glUseProgram(spriteProgram);
             glBindVertexArray(spriteVAO);
             glUniformMatrix4fv(glGetUniformLocation(spriteProgram, "projection"), 1, GL_FALSE, &orthoProj[0][0]);
@@ -1639,6 +1650,20 @@ int main(int argc, char* argv[]) {
             glUniformMatrix4fv(glGetUniformLocation(spriteProgram, "model"), 1, GL_FALSE, &spriteModel[0][0]);
             glUniform3fv(glGetUniformLocation(spriteProgram, "extraColor"), 1, &extraColors[18][0]);
             glBindTexture(GL_TEXTURE_2D, uiElements[18]);
+            glDrawArrays(GL_TRIANGLES, 0, 6);
+            spriteModel = glm::mat4(1.0f);
+            spriteModel = glm::translate(spriteModel, glm::vec3((float)SCR_WIDTH * 2.25f / 4.0f - 50.0, (float)SCR_HEIGHT * 3.5f / 4.0f - 30.0f, 0.0f));
+            spriteModel = glm::scale(spriteModel, glm::vec3(100.0f, -40.0f, 1.0f));
+            glUniformMatrix4fv(glGetUniformLocation(spriteProgram, "model"), 1, GL_FALSE, &spriteModel[0][0]);
+            glUniform3fv(glGetUniformLocation(spriteProgram, "extraColor"), 1, &extraColors[19][0]);
+            if(isMetallic) glBindTexture(GL_TEXTURE_2D, uiElements[20]);
+            else glBindTexture(GL_TEXTURE_2D, uiElements[19]);
+            glDrawArrays(GL_TRIANGLES, 0, 6);
+            spriteModel = glm::translate(spriteModel, glm::vec3(1.0f, 0.0f, 0.0f));
+            glUniformMatrix4fv(glGetUniformLocation(spriteProgram, "model"), 1, GL_FALSE, &spriteModel[0][0]);
+            glUniform3fv(glGetUniformLocation(spriteProgram, "extraColor"), 1, &extraColors[20][0]);
+            if(!isMetallic) glBindTexture(GL_TEXTURE_2D, uiElements[20]);
+            else glBindTexture(GL_TEXTURE_2D, uiElements[19]);
             glDrawArrays(GL_TRIANGLES, 0, 6);
             spriteModel = glm::mat4(1.0f);
             spriteModel = glm::translate(spriteModel, glm::vec3((float)SCR_WIDTH * 0.085f, (float)SCR_HEIGHT * 0.95f, 0.0f));
