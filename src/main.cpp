@@ -1473,6 +1473,9 @@ int main(int argc, char* argv[]) {
         glBindTexture(GL_TEXTURE_2D, ao);
         glUniform1i(glGetUniformLocation(shaderProgram, "aoMap"), 8);
 
+        if(isMetallic) glUniform1i(glGetUniformLocation(shaderProgram, "isMetallic"), 1);
+        else glUniform1i(glGetUniformLocation(shaderProgram, "isMetallic"), 0);
+
         if(shapeNum == 1)
             glDrawElements(GL_TRIANGLES, cubeIndexCount, GL_UNSIGNED_INT, 0);
         else if(shapeNum == 0)

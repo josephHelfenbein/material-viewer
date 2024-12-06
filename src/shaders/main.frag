@@ -10,6 +10,8 @@ uniform sampler2D brdfMap;
 
 const float PI = 3.14159265359;
 
+uniform int isMetallic;
+
 uniform sampler2D albedoMap;
 uniform sampler2D normalMap;
 uniform sampler2D metallicMap;
@@ -68,11 +70,17 @@ void main(){
     vec3 reflectionDir = reflect(-viewDir, normal);
 
     vec3 F0 = vec3(0.04);
-    F0 = mix(F0, albedo, metallic);
+    if(isMetallic == 1) F0 = mix(F0, albedo, metallic);
+    else{
+        F0 = vec3(metallic);
+        roughness = 1.0 - roughness;
+    }
+
 
     vec3 kS = fresnelShlickRoughness(max(dot(normal, viewDir), 0.0), F0, roughness);
     vec3 kD = 1.0 - kS;
-    kD *= 1.0 - metallic;
+    if(isMetallic == 1) kD *= 1.0 - metallic;
+    else kD *= vec3(1.0) - F0;
     vec3 irradiance = texture(irradianceMap, normal).rgb;
 
     vec3 diffuse = irradiance * albedo;
