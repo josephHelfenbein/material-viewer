@@ -460,6 +460,8 @@ void matchTextures(const std::vector<std::string> &filenames, const std::unorder
     int numFiles = filenames.size();
     std::vector<std::vector<double>> probabilities(numFiles, std::vector<double>(numTextures, 0.0));
     for (int i = 0; i < numFiles; i++) {
+        std::string format = filenames[i].substr(filenames[i].size()-3, 3);
+        if(format != "png" && format != "jpg" && format != "peg" && format != "gif" && format != "ebp" && format != "bmp" && format != "eif") continue;
         std::string normalizedFilename = normalizeString(filenames[i]);
         for (const auto &[keyword, slot] : textureMap) {
             std::string normalizedKeyword = normalizeString(keyword);
