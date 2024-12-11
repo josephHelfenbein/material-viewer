@@ -72,15 +72,12 @@ void main(){
     vec3 F0 = vec3(0.04);
     if(isMetallic == 1) F0 = mix(F0, albedo, metallic);
     else{
-        F0 = vec3(metallic);
         roughness = 1.0 - roughness;
+        F0 = vec3(pow(metallic, 2.2));
     }
-
-
     vec3 kS = fresnelShlickRoughness(max(dot(normal, viewDir), 0.0), F0, roughness);
     vec3 kD = 1.0 - kS;
-    if(isMetallic == 1) kD *= 1.0 - metallic;
-    else kD *= vec3(1.0) - F0;
+    kD *= 1.0 - metallic;
     vec3 irradiance = texture(irradianceMap, normal).rgb;
 
     vec3 diffuse = irradiance * albedo;
