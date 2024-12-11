@@ -534,25 +534,28 @@ void matchTextures(const std::vector<std::string> &filenames, const std::unorder
         }
     }
 }
-unsigned int* OpenZipFile(const char* path){
+std::pair<unsigned int*, bool> OpenZipFile(const char* path){
     const int numTextures = 5;
     unsigned int* textures = new unsigned int[numTextures];
     for(int i=0; i<numTextures; i++) textures[i] = -1;
     int err = 0;
     zip* archive = zip_open(path, 0, &err);
+    bool metallic = true;
     if(!archive) {
         std::cerr<<"Failed to open archive."<<std::endl;
         error = "Failed to open archive";
         errorTime = 0.0f;
-        return textures;
+        return {textures, metallic};
     }
     else{
         std::unordered_map<std::string, int> textureMap = {
-            {"albedo", 0}, {"diffuse", 0}, {"col", 0}, {"color", 0},
+            {"diffuse", 0}, {"color", 0}, {"col", 0},
             {"metallic", 1}, {"metalness", 1}, {"metal", 1},
-            {"normal", 2}, {"nrm", 2}, {"bump", 2},
+            {"normal", 2}, {"nrm", 2},
             {"roughness", 3}, {"rough", 3},
-            {"ao", 4}, {"ambientocclusion", 4}, {"ambient", 4}, {"occlusion", 4}
+            {"ao", 4}, {"ambient", 4}, {"occlusion", 4},
+            {"refl", 5}, {"reflection", 5},
+            {"gloss", 6}, {"glossiness", 6}
         };
         zip_int64_t numFiles = zip_get_num_entries(archive, 0);
         std::vector<std::string> filenames;
@@ -566,15 +569,25 @@ unsigned int* OpenZipFile(const char* path){
             }
             filenames.emplace_back(filename);
         }
-        std::vector<int> matchedTextures(numTextures, -1);
+        std::vector<int> matchedTextures(numTextures+2, -1);
 
-        matchTextures(filenames, textureMap, archive, numTextures, matchedTextures);
-        for (int i = 0; i < numTextures; i++) {
-            textures[i] = matchedTextures[i];
+        matchTextures(filenames, textureMap, archive, numTextures+2, matchedTextures);
+        textures[0] = matchedTextures[0];
+        textures[2] = matchedTextures[2];
+        textures[4] = matchedTextures[4];
+        if(matchedTextures[5]!=-1&&matchedTextures[6]!=-1){
+            textures[1] = matchedTextures[5];
+            textures[3] = matchedTextures[6];
+            metallic = false;
+        }
+        else{
+            textures[1] = matchedTextures[1];
+            textures[3] = matchedTextures[3];
+            metallic = true;
         }
     }
     zip_close(archive);
-    return textures;
+    return {textures, metallic};
 }
 unsigned int createShader(std::string &vertSource, std::string &fragSource){
     unsigned int vertexShader = glCreateShader(GL_VERTEX_SHADER);
@@ -1727,7 +1740,9 @@ void uploadTexture(int tex){
 void uploadZip(){
     char* newZip = OpenFileDialogZip();
     if(newZip){
-        unsigned int* textures = OpenZipFile(newZip);
+        std::pair<unsigned int*, bool> import = OpenZipFile(newZip);
+        unsigned int* textures = import.first;
+        isMetallic = import.second;
         if(textures[0] != -1)
             albedo = textures[0];
         else albedo = loadTexture(albedoLoc);
