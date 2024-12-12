@@ -294,6 +294,7 @@ float lastFrame = 0.0f;
 bool firstMouse = true;
 bool pressMouse = false;
 std::string error = "";
+bool isMetallic = true;
 float errorTime = 0.0f;
 std::string tooltip = "";
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
@@ -916,7 +917,9 @@ void writeCustomTextureFile(const char* outputPath, unsigned int albedo, unsigne
         errorTime = 0.0f;
         return;
     }
-    long long int magicNumber = 0x4D4154455249414C;
+    long long int magicNumber;
+    if(isMetallic) magicNumber = 0x4D4154455249414C;
+    else magicNumber = 0x53504543554C4152;
     outputFile.write(reinterpret_cast<const char*>(&magicNumber), sizeof(magicNumber));
     outputFile.write(reinterpret_cast<const char*>(&albedoMeta), sizeof(albedoMeta));
     outputFile.write(reinterpret_cast<const char*>(&roughnessMeta), sizeof(roughnessMeta));
@@ -971,7 +974,9 @@ void readCustomTextureFile(std::string inputPath, unsigned int &albedo, unsigned
     }
     long long int magicNumber;
     inputFile.read(reinterpret_cast<char*>(&magicNumber), sizeof(magicNumber));
-    if(magicNumber != 0x4D4154455249414C) {
+    if(magicNumber == 0x4D4154455249414C) isMetallic = true;
+    else if(magicNumber == 0x53504543554C4152) isMetallic = false;
+    else{
         std::cerr << "Invalid file format" << std::endl;
         error = "Invalid file format.";
         errorTime = 0.0f;
@@ -1248,7 +1253,6 @@ bool selectingShape = false;
 bool uploadingEnv = false;
 char* uploadedEnv = nullptr;
 bool showMaterialUI = false;
-bool isMetallic = true;
 unsigned int albedo;
 unsigned int metallic;
 unsigned int normal;
