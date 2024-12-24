@@ -11,7 +11,7 @@
 #include <stb/stb_image_write.h>
 #include <zip.h>
 #include <fstream>
-#include <ft2build.h>
+#include <freetype/include/ft2build.h>
 #include FT_FREETYPE_H
 #include <OBJ-Loader/Source/OBJ_Loader.h>
 #include <map>
