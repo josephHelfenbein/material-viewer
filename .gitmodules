@@ -7,3 +7,6 @@
 [submodule "include/OBJ-Loader"]
 	path = include/OBJ-Loader
 	url = https://github.com/Bly7/OBJ-Loader.git
+[submodule "include/freetype"]
+	path = include/freetype
+	url = https://github.com/freetype/freetype.git
