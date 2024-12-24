@@ -6,14 +6,14 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <vector>
 #define STB_IMAGE_IMPLEMENTATION
-#include <stb_image.h>
+#include <stb/stb_image.h>
 #define STB_IMAGE_WRITE_IMPLEMENTATION
-#include <stb_image_write.h>
+#include <stb/stb_image_write.h>
 #include <zip.h>
 #include <fstream>
 #include <ft2build.h>
 #include FT_FREETYPE_H
-#include <OBJ_Loader.h>
+#include <OBJ-Loader/Source/OBJ_Loader.h>
 #include <map>
 #include <mutex>
 #include <thread>
