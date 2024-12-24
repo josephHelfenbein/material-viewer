@@ -17,7 +17,7 @@
 #include <map>
 #include <mutex>
 #include <thread>
-#include <zstd.h>
+#include <zstd/lib/zstd.h>
 #include <unordered_map>
 #include <unordered_set>
 #include <regex>
