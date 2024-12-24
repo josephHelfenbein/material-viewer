@@ -10,3 +10,6 @@
 [submodule "include/freetype"]
 	path = include/freetype
 	url = https://github.com/freetype/freetype.git
+[submodule "include/glfw"]
+	path = include/glfw
+	url = https://github.com/glfw/glfw.git
