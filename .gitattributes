@@ -1,0 +1,3 @@
+src/glad.c binary
+include/glad/glad.h binary
+include/KHR/khrplatform.h binary
