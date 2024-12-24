@@ -1,2 +1,8 @@
 /materialviewer.AppDir/MaterialViewer-x86_64.AppImage
 /materialviewer.AppDir/install.sh
+/include/OBJ-Loader/*
+/include/freetype/*
+/include/glfw/*
+/include/glm/*
+/include/stb/*
+/include/zstd/*
