@@ -2,7 +2,7 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Windows Debug (CMake + MSYS2 g++)",
+      "name": "Debug MaterialViewer (Windows)",
       "type": "cppdbg",
       "request": "launch",
       "program": "${workspaceFolder}/build/materialviewer.exe",
@@ -20,11 +20,11 @@
           "ignoreFailures": true
         }
       ],
-      "preLaunchTask": "CMake: build",
+      "preLaunchTask": "CMake: configure + build",
       "internalConsoleOptions": "openOnSessionStart"
     },
     {
-      "name": "Linux Debug (CMake + g++)",
+      "name": "Debug MaterialViewer (Linux)",
       "type": "cppdbg",
       "request": "launch",
       "program": "${workspaceFolder}/build/materialviewer",
@@ -42,7 +42,7 @@
           "ignoreFailures": true
         }
       ],
-      "preLaunchTask": "CMake: build",
+      "preLaunchTask": "CMake: configure + build",
       "internalConsoleOptions": "openOnSessionStart"
     }
   ]

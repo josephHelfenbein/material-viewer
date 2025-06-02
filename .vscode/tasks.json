@@ -1,79 +1,43 @@
 {
-	"version": "2.0.0",
-	"tasks": [
-        {
-            "type": "cppbuild",
-            "label": "Build Windows Executable",
-            "command": "C:\\msys64\\ucrt64\\bin\\g++.exe",
-            "args": [
-                "-g",
-                "-std=c++17",
-                "-I${workspaceFolder}/include",
-                "-I${workspaceFolder}/include/freetype/include",
-                "-I/C/msys64/ucrt64/include",
-                "-L${workspaceFolder}/lib",
-                "-L/C/msys64/ucrt64/lib",
-                "${workspaceFolder}/src/main.cpp",
-                "${workspaceFolder}/src/glad.c",
-                "-lzip",
-                "-lzstd",
-                "-lfreetype",
-                "-lglfw3dll",
-                "-lcomdlg32",
-                "-o",
-                "${workspaceFolder}/build/materialviewer.exe"
-            ],
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "problemMatcher": [
-                "$gcc"
-            ],
-            "group": {
-                "kind": "build",
-                "isDefault": true
-            },
-            "detail": "compiler: C:/C:/path/to/g++.exe"
+    "version": "2.0.0",
+    "tasks": [
+      {
+        "label": "CMake: configure",
+        "type": "shell",
+        "command": "cmake",
+        "args": [
+          "-S", "${workspaceFolder}",
+          "-B", "${workspaceFolder}/build"
+        ],
+        "options": {
+          "cwd": "${workspaceFolder}"
         },
-        {
-            "label": "Build Linux Executable",
-            "type": "shell",
-            "command": "g++",
-            "args": [
-                "-g",
-                "-std=c++17",
-                "-I${workspaceFolder}/include",
-                "-I${workspaceFolder}/include/freetype/include",
-                "-L${workspaceFolder}/lib",
-                "${workspaceFolder}/src/main.cpp",
-                "${workspaceFolder}/src/glad.c",
-                "-DQT_WIDGETS_LIB",
-                "-I/usr/include/qt/QtWidgets",
-                "-I/usr/include/qt",
-                "-DQT_GUI_LIB",
-                "-I/usr/include/qt/QtGui",
-                "-DQT_CORE_LIB",
-                "-I/usr/include/qt/QtCore",
-                "-lzip",
-                "-lzstd",
-                "-lfreetype",
-                "-lQt5Widgets",
-                "-lQt5Gui",
-                "-lQt5Core",
-                "-lglfw",
-                "-ldl",
-                "-lm",
-                "-o",
-                "${workspaceFolder}/build/materialviewer"
-            ],
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "group": {
-                "kind": "build",
-                "isDefault": false
-            },
-            "problemMatcher": ["$gcc"]
+        "problemMatcher": [],
+        "group": "build"
+      },
+      {
+        "label": "CMake: build",
+        "type": "shell",
+        "command": "cmake",
+        "args": [
+          "--build", "${workspaceFolder}/build"
+        ],
+        "options": {
+          "cwd": "${workspaceFolder}"
+        },
+        "problemMatcher": [],
+        "group": {
+          "kind": "build",
+          "isDefault": true
         }
+      },
+      {
+        "label": "CMake: configure + build",
+        "dependsOn": ["CMake: configure", "CMake: build"],
+        "dependsOrder": "sequence",
+        "problemMatcher": [],
+        "group": "build"
+      }
     ]
-}
+  }
+  

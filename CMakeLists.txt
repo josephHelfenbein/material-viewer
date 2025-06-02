@@ -1,8 +1,7 @@
 cmake_minimum_required(VERSION 3.10)
-project(MaterialViewer LANGUAGES CXX)
+project(MaterialViewer LANGUAGES C CXX)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -30,11 +29,7 @@ if (WIN32)
         "${CMAKE_SOURCE_DIR}/lib"
         "C:/msys64/ucrt64/lib"
     )
-
-    target_compile_options(materialviewer PRIVATE
-        -g
-    )
-
+    target_compile_options(materialviewer PRIVATE -g)
     target_link_libraries(materialviewer
         PRIVATE
             zip
@@ -46,45 +41,35 @@ if (WIN32)
 endif()
 
 if (UNIX AND NOT APPLE)
-    target_compile_options(materialviewer PRIVATE
-        -g
-    )
+
+    target_compile_options(materialviewer PRIVATE -g)
 
     find_package(Qt5 REQUIRED COMPONENTS Widgets Gui Core)
+
     target_compile_definitions(materialviewer PRIVATE
         QT_WIDGETS_LIB
         QT_GUI_LIB
         QT_CORE_LIB
     )
-    target_include_directories(materialviewer PRIVATE
-        /usr/include/qt/QtWidgets
-        /usr/include/qt
-        /usr/include/qt/QtGui
-        /usr/include/qt/QtCore
-    )
 
     find_package(Freetype REQUIRED)
 
-    find_package(glfw3 3.3 QUIET)
-    if (glfw3_FOUND)
-        set(GLFW_LIB_TARGET glfw)
-    else()
-        set(GLFW_LIB_TARGET glfw)
-    endif()
+    find_package(glfw3 3.3 REQUIRED)
 
-    find_library(ZIP_LIB   zip)
-    find_library(ZSTD_LIB  zstd)
+    find_library(ZSTD_LIB zstd REQUIRED)
+    find_library(ZIP_LIB zip REQUIRED)
 
     target_link_libraries(materialviewer
         PRIVATE
-            ${ZIP_LIB}
-            ${ZSTD_LIB}
-            Freetype::Freetype
             Qt5::Widgets
             Qt5::Gui
             Qt5::Core
-            ${GLFW_LIB_TARGET}
+            Freetype::Freetype
+            glfw
+            ${ZSTD_LIB}
+            ${ZIP_LIB}
             dl
             m
     )
+
 endif()

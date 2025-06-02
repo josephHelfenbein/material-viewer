@@ -125,7 +125,8 @@ To compile the project on Windows, you'll need:
     - `zstd` (for Zstandard compression)
     - `freetype` (for font rendering)
     - `glfw` (for creating windows, OpenGL contexts)
-3. Run the `Windows Debug (g++ exe)` configuration in VSCode.
+    - `cmake` (for building)
+3. Run the `Debug MaterialViewer (Windows)` configuration in VSCode.
 
 ### Linux
 
@@ -139,7 +140,8 @@ To compile the project on Linux, you'll need:
     - `qtbase5-dev` (for Qt core libraries)
     - `qt5-qmake` (for compiling Qt applications)
     - `libqt5widgets5`, `libqt5gui5`, `libqt5core5a` (for UI elements)
-3. Run the `Linux Debug (g++)` configuration in VSCode.
+    - `cmake` (for building)
+3. Run the `Debug MaterialViewer (Linux)` configuration in VSCode.
 
 <!-- LICENSE -->
 ## License
