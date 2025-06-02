@@ -2,12 +2,27 @@
     "version": "2.0.0",
     "tasks": [
       {
-        "label": "CMake: configure",
+        "label": "CMake: configure (Linux)",
         "type": "shell",
         "command": "cmake",
         "args": [
           "-S", "${workspaceFolder}",
           "-B", "${workspaceFolder}/build"
+        ],
+        "options": {
+          "cwd": "${workspaceFolder}"
+        },
+        "problemMatcher": [],
+        "group": "build"
+      },
+      {
+        "label": "CMake: configure (Windows)",
+        "type": "shell",
+        "command": "cmake",
+        "args": [
+          "-S", "${workspaceFolder}",
+          "-B", "${workspaceFolder}/build",
+          "-G", "MinGW Makefiles"
         ],
         "options": {
           "cwd": "${workspaceFolder}"
@@ -32,8 +47,15 @@
         }
       },
       {
-        "label": "CMake: configure + build",
-        "dependsOn": ["CMake: configure", "CMake: build"],
+        "label": "CMake: configure + build (Linux)",
+        "dependsOn": ["CMake: configure (Linux)", "CMake: build"],
+        "dependsOrder": "sequence",
+        "problemMatcher": [],
+        "group": "build"
+      },
+      {
+        "label": "CMake: configure + build (Windows)",
+        "dependsOn": ["CMake: configure (Windows)", "CMake: build"],
         "dependsOrder": "sequence",
         "problemMatcher": [],
         "group": "build"

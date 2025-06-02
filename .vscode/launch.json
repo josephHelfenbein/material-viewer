@@ -20,7 +20,7 @@
           "ignoreFailures": true
         }
       ],
-      "preLaunchTask": "CMake: configure + build",
+      "preLaunchTask": "CMake: configure + build (Windows)",
       "internalConsoleOptions": "openOnSessionStart"
     },
     {
@@ -42,7 +42,7 @@
           "ignoreFailures": true
         }
       ],
-      "preLaunchTask": "CMake: configure + build",
+      "preLaunchTask": "CMake: configure + build (Linux)",
       "internalConsoleOptions": "openOnSessionStart"
     }
   ]

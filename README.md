@@ -120,12 +120,13 @@ To install **Material Viewer**, download the appropriate file from the [Releases
 To compile the project on Windows, you'll need:
 1. **MSYS2** - Install [MSYS2](https://www.msys2.org/) and set up the `ucrt64` environment for access to the necessary libraries and compiler.
     - Ensure `g++` is available at `C:\msys64\ucrt64\bin\g++.exe`.
+    Add an envionment variable to your system: `C:\msys64\ucrt64\bin`
 2. **Libraries** - Install the following libraries using the MSYS2 package manager:
-    - `libzip` (for handling zip archives)
-    - `zstd` (for Zstandard compression)
-    - `freetype` (for font rendering)
-    - `glfw` (for creating windows, OpenGL contexts)
-    - `cmake` (for building)
+    - `mingw-w64-ucrt-x86_64-libzip` (for handling zip archives)
+    - `mingw-w64-ucrt-x86_64-zstd` (for Zstandard compression)
+    - `mingw-w64-ucrt-x86_64-freetype` (for font rendering)
+    - `mingw-w64-ucrt-x86_64-glfw` (for creating windows, OpenGL contexts)
+    - `mingw-w64-ucrt-x86_64-cmake` (for building)
 3. Run the `Debug MaterialViewer (Windows)` configuration in VSCode.
 
 ### Linux
