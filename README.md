@@ -69,6 +69,11 @@
 A 3D desktop application to preview PBR materials made using OpenGL and C++. Featuring HDRI environments, image-based lighting, and PBR shading. You can upload individual image textures, upload a custom .mat file, or a .zip to preview the material. You can also save the material you're viewing to the custom .mat filetype for easy previewing and distribution of a PBR material.
 
 ## Screenshots
+
+
+https://github.com/user-attachments/assets/0e9416dd-c2ba-477a-9f40-7de1678c988d
+
+
 ![screenshot](https://github.com/josephHelfenbein/material-viewer/blob/521a4a78ac07ad73d460f9166157c720a0adae96/src/resources/pbr.PNG)
 ![screenshot](https://github.com/josephHelfenbein/material-viewer/blob/521a4a78ac07ad73d460f9166157c720a0adae96/src/resources/pbr2.PNG)
 ![screenshot](https://github.com/josephHelfenbein/material-viewer/blob/521a4a78ac07ad73d460f9166157c720a0adae96/src/resources/pbr3.PNG)
