@@ -24,6 +24,11 @@
 #include <algorithm>
 #include <cstdlib>
 
+#if defined(__APPLE__)
+#include <mach-o/dyld.h>
+#include <limits.h>
+#endif
+
 #if defined(_WIN32) || defined(__CYGWIN__)
 #include <windows.h>
 #include <commdlg.h>
@@ -411,6 +416,31 @@ std::string getAppPath(const char* relativePath){
         pathBuffer = exeDir.substr(0, exeDir.find_last_of("\\/")) + "\\src" + replaceSlashes(relativePathStr);
     } 
     else pathBuffer = exeDir + "\\src" + replaceSlashes(relativePathStr);
+#elif defined(__APPLE__)
+    char execPath[PATH_MAX];
+    uint32_t size = sizeof(execPath);
+    if (_NSGetExecutablePath(execPath, &size) == 0) {
+        char* realPath = realpath(execPath, nullptr);
+        if (realPath) {
+            std::string exeDir(realPath);
+            free(realPath);
+            size_t macosPos = exeDir.rfind("/Contents/MacOS/");
+            if (macosPos != std::string::npos) {
+                pathBuffer = exeDir.substr(0, macosPos) + "/Contents/Resources" + relativePathStr;
+            } else {
+                size_t buildPos = exeDir.rfind("/build/");
+                if (buildPos != std::string::npos) {
+                    pathBuffer = exeDir.substr(0, buildPos) + "/src" + relativePathStr;
+                } else {
+                    pathBuffer = std::string("./src") + relativePathStr;
+                }
+            }
+        } else {
+            pathBuffer = std::string("./src") + relativePathStr;
+        }
+    } else {
+        pathBuffer = std::string("./src") + relativePathStr;
+    }
 #else
     const char* appdir = std::getenv("APPDIR");
     if (appdir) pathBuffer = std::string(appdir) + std::string("/src") + relativePathStr;

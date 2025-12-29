@@ -6,4 +6,3 @@ include/KHR/khrplatform.h linguist-vendored
 *.comp linguist-language=GLSL
 *.vert linguist-language=GLSL
 *.frag linguist-language=GLSL
-materialviewer.AppDir/**/* linguist-vendored
