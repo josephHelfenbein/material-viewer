@@ -91,6 +91,54 @@ else
     echo "Install Qt5 via Homebrew: brew install qt@5"
 fi
 
+# Bundle non-Qt dynamic libraries
+echo "Bundling other dynamic libraries..."
+mkdir -p "${APP_DIR}/Contents/Frameworks"
+
+BINARY="${APP_DIR}/Contents/MacOS/${BINARY_NAME}"
+
+# Function to get the library install name
+get_lib_id() {
+    otool -D "$1" 2>/dev/null | tail -1
+}
+
+# Function to fix a library's dependencies recursively
+fix_lib_deps() {
+    local lib="$1"
+    local deps=$(otool -L "$lib" 2>/dev/null | grep -E "^\s+/(opt/homebrew|usr/local)" | awk '{print $1}')
+    
+    for dep in $deps; do
+        local dep_name=$(basename "$dep")
+        local dest="${APP_DIR}/Contents/Frameworks/${dep_name}"
+        
+        # Copy if not already present
+        if [ ! -f "$dest" ] && [ -f "$dep" ]; then
+            echo "  Copying $dep_name"
+            cp "$dep" "$dest"
+            chmod 755 "$dest"
+            
+            # Fix the copied library's own id
+            install_name_tool -id "@executable_path/../Frameworks/${dep_name}" "$dest" 2>/dev/null || true
+            
+            # Recursively fix its dependencies
+            fix_lib_deps "$dest"
+        fi
+        
+        # Update reference in the current library
+        install_name_tool -change "$dep" "@executable_path/../Frameworks/${dep_name}" "$lib" 2>/dev/null || true
+    done
+}
+
+# Fix the main binary
+fix_lib_deps "$BINARY"
+
+# Fix all libraries in Frameworks (including those added by macdeployqt)
+for fw in "${APP_DIR}/Contents/Frameworks"/*.dylib; do
+    if [ -f "$fw" ]; then
+        fix_lib_deps "$fw"
+    fi
+done
+
 # Ad-hoc code sign (required for Apple Silicon)
 echo "Code signing..."
 codesign --deep --force --sign - "${APP_DIR}"
