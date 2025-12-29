@@ -1,2 +1,25 @@
+# Build output
 /build/**
+
+# macOS
 .DS_Store
+
+# Generated embedded resources
+src/embedded_resources.cpp
+src/embedded_resources.h
+include/embedded_resources.h
+
+# IDE
+.vscode/
+*.swp
+*.swo
+*~
+
+# Windows
+Thumbs.db
+*.exe
+*.dll
+
+# Temp files
+*.tmp
+*.log

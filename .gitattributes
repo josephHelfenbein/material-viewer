@@ -1,8 +1,31 @@
+# Vendored files
 src/glad.c linguist-vendored
 include/glad/glad.h linguist-vendored
 include/KHR/khrplatform.h linguist-vendored
+include/incbin/incbin.h linguist-vendored
 
-
+# Shader languages
 *.comp linguist-language=GLSL
 *.vert linguist-language=GLSL
 *.frag linguist-language=GLSL
+
+# Ensure consistent line endings for shaders
+*.vert text eol=lf
+*.frag text eol=lf
+*.comp text eol=lf
+*.glsl text eol=lf
+
+# Binary files
+*.hdr binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.ico binary
+*.ttf binary
+*.obj binary
+*.mat binary
+
+# Scripts
+*.sh text eol=lf
+*.py text eol=lf
+*.bat text eol=crlf

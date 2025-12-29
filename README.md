@@ -56,6 +56,7 @@
     <li><a href="#about-the-project">About The Project</a></li>
     <li><a href="#installation">Installation</a></li>
     <li><a href="#prerequisites">Prerequisites</a></li>
+    <li><a href="#creating-standalone-distributions">Creating Standalone Distributions</a></li>
     <li><a href="#license">License</a></li>
     <li><a href="#acknowledgments">Acknowledgments</a></li>
   </ol>
@@ -177,6 +178,72 @@ To compile the project on macOS, you'll need:
    cmake --build build
    ```
 5. The built executable will be at `build/materialviewer`.
+
+## Creating Standalone Distributions
+
+The project supports creating fully self-contained standalone executables with all resources embedded. No external files or DLLs are required.
+
+### Step 1: Generate Embedded Resources
+
+Before building a standalone version, generate the embedded resources file:
+
+```bash
+python3 scripts/embed_resources.py src src/embedded_resources.h src/embedded_resources.cpp
+```
+
+This embeds all shaders, textures, HDR environments, fonts, models, and UI assets directly into the executable.
+
+### Windows (Single .exe)
+
+Creates a fully static ~120MB executable with everything embedded:
+
+```bash
+# Option 1: Use the distribution script
+scripts\create-windows-dist.bat
+
+# Option 2: Manual build
+cmake -S . -B build -G "MinGW Makefiles"
+cmake --build build
+```
+
+The executable at `build/materialviewer.exe` is completely standalone - no DLLs needed (uses only Windows system libraries).
+
+### Linux (AppDir / AppImage)
+
+Creates an AppDir structure with all dependencies bundled:
+
+```bash
+# Create the AppDir (includes building)
+scripts/create-linux-appimage.sh
+```
+
+This creates `build/materialviewer.AppDir/` with the binary, resources, and bundled libraries.
+
+To create an AppImage from the AppDir, install `appimagetool` and run:
+
+```bash
+# Install appimagetool (if not already installed)
+wget https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
+chmod +x appimagetool-x86_64.AppImage
+
+# Create the AppImage
+cd build && ../appimagetool-x86_64.AppImage materialviewer.AppDir MaterialViewer-x86_64.AppImage
+```
+
+### macOS (App Bundle)
+
+Creates a `.app` bundle for macOS:
+
+```bash
+# Build the project first  
+cmake -S . -B build
+cmake --build build
+
+# Create the .app bundle
+scripts/create-macos-app.sh
+```
+
+The `MaterialViewer.app` bundle will be created in the `build` directory.
 
 
 <!-- LICENSE -->

@@ -5,12 +5,14 @@
 #include <glm/glm/gtc/matrix_transform.hpp>
 #include <glm/glm/gtc/type_ptr.hpp>
 #include <vector>
+#include <memory>
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb/stb_image.h>
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include <stb/stb_image_write.h>
 #include <zip.h>
 #include <fstream>
+#include <sstream>
 #include <freetype/include/ft2build.h>
 #include FT_FREETYPE_H
 #include <OBJ-Loader/Source/OBJ_Loader.h>
@@ -23,6 +25,7 @@
 #include <regex>
 #include <algorithm>
 #include <cstdlib>
+#include "embedded_resources.h"
 
 #if defined(__APPLE__)
 #include <mach-o/dyld.h>
@@ -309,7 +312,36 @@ std::string tooltip = "";
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void mouseCallback(GLFWwindow* window, double xpos, double ypos);
 void processInput(GLFWwindow *window);
+
+std::string toResourcePath(const std::string& path) {
+    std::string result = path;
+    for (char& c : result) {
+        if (c == '\\') c = '/';
+    }
+    size_t srcPos = result.find("/src/");
+    if (srcPos != std::string::npos) {
+        result = result.substr(srcPos + 5);
+    } else {
+        srcPos = result.find("src/");
+        if (srcPos == 0) {
+            result = result.substr(4);
+        }
+    }
+    if (!result.empty() && result[0] == '/') {
+        result = result.substr(1);
+    }
+    return result;
+}
+
 char* getShaders(std::string file){
+    std::string resourcePath = toResourcePath(file);
+    const auto* resource = EmbeddedResources::getResource(resourcePath);
+    if (resource) {
+        char* shader = (char*)malloc(*resource->size + 1);
+        memcpy(shader, resource->data, *resource->size);
+        shader[*resource->size] = '\0';
+        return shader;
+    }
     FILE* shaderFile = fopen(file.c_str(), "r");
     if(!shaderFile) {
         std::cerr<<"Error opening shader file at "<<file<<"\n";
@@ -330,7 +362,15 @@ char* getShaders(std::string file){
 unsigned int loadEnv(std::string file){
     stbi_set_flip_vertically_on_load(true);
     int width, height, nrComponents;
-    float* data = stbi_loadf(file.c_str(), &width, &height, &nrComponents, 0);
+    float* data = nullptr;
+    std::string resourcePath = toResourcePath(file);
+    const auto* resource = EmbeddedResources::getResource(resourcePath);
+    if (resource) {
+        data = stbi_loadf_from_memory(resource->data, static_cast<int>(*resource->size), &width, &height, &nrComponents, 0);
+    } else {
+        data = stbi_loadf(file.c_str(), &width, &height, &nrComponents, 0);
+    }
+    
     unsigned int hdrTexture;
     if(data){
         glGenTextures(1, &hdrTexture);
@@ -353,7 +393,16 @@ unsigned int loadTexture(std::string file){
     unsigned int textureID;
     glGenTextures(1, &textureID);
     int width, height, nrComponents;
-    unsigned char* data = stbi_load(file.c_str(), &width, &height, &nrComponents, 0);
+    unsigned char* data = nullptr;
+    
+    std::string resourcePath = toResourcePath(file);
+    const auto* resource = EmbeddedResources::getResource(resourcePath);
+    if (resource) {
+        data = stbi_load_from_memory(resource->data, static_cast<int>(*resource->size), &width, &height, &nrComponents, 0);
+    } else {
+        data = stbi_load(file.c_str(), &width, &height, &nrComponents, 0);
+    }
+    
     if(data){
         GLenum format = GL_RGB;
         if(nrComponents == 1) format = GL_RED;
@@ -412,8 +461,14 @@ std::string getAppPath(const char* relativePath){
     std::string exeDir(path);
     exeDir = exeDir.substr(0, exeDir.find_last_of("\\/"));
     std::string modifiedRelativePath = replaceSlashes(relativePathStr);
-    if (exeDir.find("build") != std::string::npos) {
-        pathBuffer = exeDir.substr(0, exeDir.find_last_of("\\/")) + "\\src" + replaceSlashes(relativePathStr);
+    std::string parentDir = exeDir.substr(0, exeDir.find_last_of("\\/"));
+    std::string srcInParent = parentDir + "\\src";
+    std::string srcInExeDir = exeDir + "\\src";
+    if (GetFileAttributesA(srcInExeDir.c_str()) != INVALID_FILE_ATTRIBUTES) {
+        pathBuffer = srcInExeDir + replaceSlashes(relativePathStr);
+    }
+    else if (GetFileAttributesA(srcInParent.c_str()) != INVALID_FILE_ATTRIBUTES) {
+        pathBuffer = srcInParent + replaceSlashes(relativePathStr);
     } 
     else pathBuffer = exeDir + "\\src" + replaceSlashes(relativePathStr);
 #elif defined(__APPLE__)
@@ -1013,21 +1068,46 @@ void writeCustomTextureFile(const char* outputPath, unsigned int albedo, unsigne
     std::cout << "Material file written to " << outputPath << std::endl;
     return;
 }
+
+class MemoryBuffer : public std::streambuf {
+public:
+    MemoryBuffer(const unsigned char* data, size_t size) {
+        char* p = const_cast<char*>(reinterpret_cast<const char*>(data));
+        setg(p, p, p + size);
+    }
+};
+
 void readCustomTextureFile(std::string inputPath, unsigned int &albedo, unsigned int &roughness, unsigned int &normal, unsigned int &metallic, unsigned int &ao){
     unsigned int albedoID;
     unsigned int roughnessID;
     unsigned int normalID;
     unsigned int metallicID;
     unsigned int aoID;
-    std::ifstream inputFile(inputPath, std::ios::binary);
-    if(!inputFile.is_open()){
-        std::cerr << "Failed to load material file" << std::endl;
-        error = "Failed to load material file.";
-        errorTime = 0.0f;
-        return;
+    std::string resourcePath = toResourcePath(inputPath);
+    const auto* resource = EmbeddedResources::getResource(resourcePath);
+    
+    std::unique_ptr<MemoryBuffer> memBuf;
+    std::unique_ptr<std::istream> inputStream;
+    std::ifstream inputFile;
+    
+    if (resource) {
+        memBuf = std::make_unique<MemoryBuffer>(resource->data, *resource->size);
+        inputStream = std::make_unique<std::istream>(memBuf.get());
+    } else {
+        inputFile.open(inputPath, std::ios::binary);
+        if(!inputFile.is_open()){
+            std::cerr << "Failed to load material file" << std::endl;
+            error = "Failed to load material file.";
+            errorTime = 0.0f;
+            return;
+        }
+        inputStream = std::make_unique<std::istream>(inputFile.rdbuf());
     }
+    
+    std::istream& input = *inputStream;
+    
     long long int magicNumber;
-    inputFile.read(reinterpret_cast<char*>(&magicNumber), sizeof(magicNumber));
+    input.read(reinterpret_cast<char*>(&magicNumber), sizeof(magicNumber));
     if(magicNumber == 0x4D4154455249414C) isMetallic = true;
     else if(magicNumber == 0x53504543554C4152) isMetallic = false;
     else{
@@ -1037,16 +1117,16 @@ void readCustomTextureFile(std::string inputPath, unsigned int &albedo, unsigned
         return;
     }
     TextureMetadata albedoMeta, roughnessMeta, normalMeta, metalnessMeta, aoMeta;
-    inputFile.read(reinterpret_cast<char*>(&albedoMeta), sizeof(albedoMeta));
-    inputFile.read(reinterpret_cast<char*>(&roughnessMeta), sizeof(roughnessMeta));
-    inputFile.read(reinterpret_cast<char*>(&normalMeta), sizeof(normalMeta));
-    inputFile.read(reinterpret_cast<char*>(&metalnessMeta), sizeof(metalnessMeta));
-    inputFile.read(reinterpret_cast<char*>(&aoMeta), sizeof(aoMeta));
-    auto loadTextureFromStream = [&inputFile](const TextureMetadata& meta) -> ImageData* {
+    input.read(reinterpret_cast<char*>(&albedoMeta), sizeof(albedoMeta));
+    input.read(reinterpret_cast<char*>(&roughnessMeta), sizeof(roughnessMeta));
+    input.read(reinterpret_cast<char*>(&normalMeta), sizeof(normalMeta));
+    input.read(reinterpret_cast<char*>(&metalnessMeta), sizeof(metalnessMeta));
+    input.read(reinterpret_cast<char*>(&aoMeta), sizeof(aoMeta));
+    auto loadTextureFromStream = [&input](const TextureMetadata& meta) -> ImageData* {
         size_t compressedSize;
-        inputFile.read(reinterpret_cast<char*>(&compressedSize), sizeof(compressedSize));
+        input.read(reinterpret_cast<char*>(&compressedSize), sizeof(compressedSize));
         std::vector<unsigned char> compressedData(compressedSize);
-        inputFile.read(reinterpret_cast<char*>(compressedData.data()), compressedSize);
+        input.read(reinterpret_cast<char*>(compressedData.data()), compressedSize);
         size_t decompressedSize = meta.width * meta.height * meta.channels;
         ImageData* imageData = new ImageData();
         imageData->width = meta.width;
@@ -1084,7 +1164,7 @@ void readCustomTextureFile(std::string inputPath, unsigned int &albedo, unsigned
     delete metalnessData;
     delete[] aoData->data;
     delete aoData;
-    inputFile.close();
+    if (inputFile.is_open()) inputFile.close();
     albedo = albedoID;
     roughness = roughnessID;
     normal = normalID;
@@ -1109,7 +1189,15 @@ void prepareCharacters(){
         return;
     }
     FT_Face face;
-    if(FT_New_Face(ft, getAppPath("/resources/Roboto-Regular.ttf").c_str(), 0, &face)){
+    const auto* resource = EmbeddedResources::getResource("resources/Roboto-Regular.ttf");
+    FT_Error ftError;
+    if (resource) {
+        ftError = FT_New_Memory_Face(ft, resource->data, static_cast<FT_Long>(*resource->size), 0, &face);
+    } else {
+        ftError = FT_New_Face(ft, getAppPath("/resources/Roboto-Regular.ttf").c_str(), 0, &face);
+    }
+    
+    if(ftError){
         std::cerr<<"Could not load font"<<std::endl;
         error = "Could not load font.";
         errorTime = 0.0f;
@@ -1175,7 +1263,31 @@ void RenderText(unsigned int shader, unsigned int VAO, unsigned int VBO, std::st
 }
 void loadModel(std::string filePath, unsigned int &VAO, unsigned int &VBO, unsigned int &EBO, unsigned int &indexCount){
     objl::Loader loader;
-    if(!loader.LoadFile(filePath.c_str())){
+    bool loaded = false;
+    std::string tempFilePath;
+    
+    std::string resourcePath = toResourcePath(filePath);
+    const auto* resource = EmbeddedResources::getResource(resourcePath);
+    if (resource) {
+#if defined(_WIN32) || defined(__CYGWIN__)
+        char tempPath[MAX_PATH];
+        GetTempPathA(MAX_PATH, tempPath);
+        tempFilePath = std::string(tempPath) + "materialviewer_temp.obj";
+#else
+        tempFilePath = "/tmp/materialviewer_temp.obj";
+#endif
+        std::ofstream tempFile(tempFilePath, std::ios::binary);
+        if (tempFile) {
+            tempFile.write(reinterpret_cast<const char*>(resource->data), *resource->size);
+            tempFile.close();
+            loaded = loader.LoadFile(tempFilePath);
+            std::remove(tempFilePath.c_str());
+        }
+    } else {
+        loaded = loader.LoadFile(filePath.c_str());
+    }
+    
+    if(!loaded){
         std::cerr<<"Failed to load OBJ file"<<std::endl;
         error = "Failed to load OBJ file";
         errorTime = 0.0f;
