@@ -73,3 +73,41 @@ if (UNIX AND NOT APPLE)
     )
 
 endif()
+
+if (APPLE)
+    target_compile_options(materialviewer PRIVATE -g)
+    list(APPEND CMAKE_PREFIX_PATH "/opt/homebrew/opt/qt@5")
+    find_package(Qt5 REQUIRED COMPONENTS Widgets Gui Core)
+    target_compile_definitions(materialviewer PRIVATE
+        QT_WIDGETS_LIB
+        QT_GUI_LIB
+        QT_CORE_LIB
+        GL_SILENCE_DEPRECATION
+    )
+
+    find_package(Freetype REQUIRED)
+    find_package(glfw3 3.3 REQUIRED)
+    find_library(ZSTD_LIB zstd REQUIRED)
+    find_library(ZIP_LIB zip REQUIRED)
+
+    find_library(COCOA_FRAMEWORK Cocoa REQUIRED)
+    find_library(IOKIT_FRAMEWORK IOKit REQUIRED)
+    find_library(COREVIDEO_FRAMEWORK CoreVideo REQUIRED)
+    find_library(OPENGL_FRAMEWORK OpenGL REQUIRED)
+
+    target_link_libraries(materialviewer
+        PRIVATE
+            Qt5::Widgets
+            Qt5::Gui
+            Qt5::Core
+            Freetype::Freetype
+            glfw
+            ${ZSTD_LIB}
+            ${ZIP_LIB}
+            ${COCOA_FRAMEWORK}
+            ${IOKIT_FRAMEWORK}
+            ${COREVIDEO_FRAMEWORK}
+            ${OPENGL_FRAMEWORK}
+    )
+
+endif()

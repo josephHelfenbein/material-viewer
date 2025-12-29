@@ -281,6 +281,10 @@ char* OpenFileDialogMaterial(){
 #endif
 unsigned int SCR_WIDTH=800;
 unsigned int SCR_HEIGHT=600;
+float contentScale = 1.0f;
+
+inline float ui(float value) { return value * contentScale; }
+
 const float pi = 3.14159265359;
 float radius = 5.0f;
 float yaw = pi/8;
@@ -327,18 +331,17 @@ unsigned int loadEnv(std::string file){
         glGenTextures(1, &hdrTexture);
         glBindTexture(GL_TEXTURE_2D, hdrTexture);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, width, height, 0, GL_RGB, GL_FLOAT, data);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         stbi_image_free(data);
     }
     else{
         std::cerr<<"HDR image failed to load at path "<<file<<std::endl;
         error = "HDR image failed to load.";
         errorTime = 0.0f;
-        stbi_image_free(data);
     }
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     return hdrTexture;
 }
 unsigned int loadTexture(std::string file){
@@ -347,7 +350,7 @@ unsigned int loadTexture(std::string file){
     int width, height, nrComponents;
     unsigned char* data = stbi_load(file.c_str(), &width, &height, &nrComponents, 0);
     if(data){
-        GLenum format;
+        GLenum format = GL_RGB;
         if(nrComponents == 1) format = GL_RED;
         else if(nrComponents == 3) format = GL_RGB;
         else if(nrComponents == 4) format = GL_RGBA;
@@ -358,14 +361,13 @@ unsigned int loadTexture(std::string file){
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        stbi_image_free(data);
     }
     else{
         std::cerr<<"Texture image failed to load at path "<<file<<std::endl;
         error = "Texture image failed to load.";
         errorTime = 0.0f;
-        stbi_image_free(data);
     }
+    stbi_image_free(data);
     return textureID;
 }
 struct ImageData{
@@ -377,8 +379,8 @@ struct ImageData{
 };
 unsigned int loadTexture(ImageData* imageData){
     unsigned int textureID;
-    glGenTextures(2, &textureID);
-    GLenum format;
+    glGenTextures(1, &textureID);
+    GLenum format = GL_RGB;
     int nrComponents = imageData->channels;
     if(nrComponents == 1) format = GL_RED;
     else if(nrComponents == 3) format = GL_RGB;
@@ -448,7 +450,7 @@ double computeCosineSimilarity(const std::vector<std::string> &vec1, const std::
     for(const auto &gram : vec2) freq2[gram]++;
     double dot = 0.0, mag1 = 0.0, mag2 = 0.0;
     for(const auto &[gram, count1] : freq1){
-        if(freq2.count(gram)) dot += count1 * freq1[gram];
+        if(freq2.count(gram)) dot += count1 * freq2[gram];
         mag1 += count1 * count1;
     }
     for(const auto &[gram, count2] : freq2){
@@ -457,18 +459,29 @@ double computeCosineSimilarity(const std::vector<std::string> &vec1, const std::
     if (mag1 == 0 || mag2 == 0) return 0.0;
     return dot / (std::sqrt(mag1) * std::sqrt(mag2));
 }
+double computeMatchScore(const std::string &filename, const std::string &keyword){
+    std::string normalizedFilename = normalizeString(filename);
+    std::string normalizedKeyword = normalizeString(keyword);
+    std::istringstream iss(normalizedFilename);
+    std::string word;
+    while(iss >> word){
+        if(word == normalizedKeyword) return 1.0;
+    }
+    if(normalizedKeyword.length() >= 3 && normalizedFilename.find(normalizedKeyword) != std::string::npos){
+        return 0.9;
+    }
+    auto filenameNgrams = generateNgrams(normalizedFilename, 3);
+    auto keywordNgrams = generateNgrams(normalizedKeyword, 3);
+    return computeCosineSimilarity(filenameNgrams, keywordNgrams) * 0.8;
+}
 void matchTextures(const std::vector<std::string> &filenames, const std::unordered_map<std::string, int> &textureMap, zip* archive, int numTextures, std::vector<int> &textures){
     int numFiles = filenames.size();
     std::vector<std::vector<double>> probabilities(numFiles, std::vector<double>(numTextures, 0.0));
     for (int i = 0; i < numFiles; i++) {
         std::string format = filenames[i].substr(filenames[i].size()-3, 3);
         if(format != "png" && format != "jpg" && format != "peg" && format != "gif" && format != "ebp" && format != "bmp" && format != "eif") continue;
-        std::string normalizedFilename = normalizeString(filenames[i]);
         for (const auto &[keyword, slot] : textureMap) {
-            std::string normalizedKeyword = normalizeString(keyword);
-            auto filenameNgrams = generateNgrams(normalizedFilename, 3);
-            auto keywordNgrams = generateNgrams(normalizedKeyword, 3);
-            probabilities[i][slot] = computeCosineSimilarity(filenameNgrams, keywordNgrams);
+            probabilities[i][slot] = std::max(probabilities[i][slot], computeMatchScore(filenames[i], keyword));
         }
     }
     std::vector<bool> assignedSlots(numTextures, false);
@@ -552,12 +565,12 @@ std::pair<unsigned int*, bool> OpenZipFile(const char* path){
     }
     else{
         std::unordered_map<std::string, int> textureMap = {
-            {"diffuse", 0}, {"color", 0}, {"col", 0},
+            {"albedo", 0}, {"diffuse", 0}, {"color", 0}, {"col", 0}, {"base", 0},
             {"metallic", 1}, {"metalness", 1}, {"metal", 1},
-            {"normal", 2}, {"nrm", 2},
+            {"normal", 2}, {"nrm", 2}, {"nor", 2},
             {"roughness", 3}, {"rough", 3},
             {"ao", 4}, {"ambient", 4}, {"occlusion", 4},
-            {"refl", 5}, {"reflection", 5},
+            {"refl", 5}, {"reflection", 5}, {"specular", 5}, {"spec", 5},
             {"gloss", 6}, {"glossiness", 6}
         };
         zip_int64_t numFiles = zip_get_num_entries(archive, 0);
@@ -808,20 +821,31 @@ ImageData* loadTextureData(unsigned int textureID){
     glBindTexture(GL_TEXTURE_2D, textureID);
     glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &imgData->width);
     glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &imgData->height);
-    GLint format;
-    glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_INTERNAL_FORMAT, &format);
-    switch(format){
+    GLint internalFormat;
+    glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_INTERNAL_FORMAT, &internalFormat);
+    GLenum format;
+    switch(internalFormat){
         case GL_RGB:
+        case GL_RGB8:
+        case GL_SRGB:
+        case GL_SRGB8:
             imgData->channels = 3;
+            format = GL_RGB;
             break;
         case GL_RGBA:
+        case GL_RGBA8:
+        case GL_SRGB_ALPHA:
+        case GL_SRGB8_ALPHA8:
             imgData->channels = 4;
+            format = GL_RGBA;
             break;
         case GL_RED:
+        case GL_R8:
             imgData->channels = 1;
+            format = GL_RED;
             break;
         default:
-            std::cerr<<"Unsupported texture format."<<std::endl;
+            std::cerr<<"Unsupported texture format: "<<internalFormat<<std::endl;
             error = "Unsupported texture format.";
             errorTime = 0.0f;
             delete imgData;
@@ -1242,7 +1266,8 @@ std::string uiElementLocs[] = {
     getAppPath("/ui/img_ui20.png"),
     getAppPath("/ui/img_ui21.png"),
 };
-glm::vec3 extraColors[sizeof(uiElementLocs)/32];
+constexpr size_t UI_ELEMENT_COUNT = 21;
+glm::vec3 extraColors[UI_ELEMENT_COUNT];
 std::string cubeLoc = getAppPath("/models/cube.obj");
 std::string sphereLoc = getAppPath("/models/sphere.obj");
 std::string teapotLoc = getAppPath("/models/teapot.obj");
@@ -1269,6 +1294,9 @@ int main(int argc, char* argv[]) {
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+#ifdef __APPLE__
+    glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
+#endif
 
     GLFWwindow* window;
     window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "Material Viewer", nullptr, nullptr);
@@ -1280,6 +1308,13 @@ int main(int argc, char* argv[]) {
     glfwMakeContextCurrent(window);
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
     glfwSetCursorPosCallback(window, mouseCallback);
+    int fbWidth, fbHeight;
+    glfwGetFramebufferSize(window, &fbWidth, &fbHeight);
+    SCR_WIDTH = fbWidth;
+    SCR_HEIGHT = fbHeight;
+    int winWidth, winHeight;
+    glfwGetWindowSize(window, &winWidth, &winHeight);
+    contentScale = (float)fbWidth / (float)winWidth; // for Retina or high-DPI displays
 
     if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
         std::cerr << "Failed to initialize GLAD" << std::endl;
@@ -1372,11 +1407,11 @@ int main(int argc, char* argv[]) {
     } 
     else std::cout << "No file provided." << std::endl;
 
-    for(unsigned int i=0; i<sizeof(extraColors) / 12; i++){
+    for(unsigned int i=0; i<UI_ELEMENT_COUNT; i++){
         extraColors[i] = glm::vec3(1.0f);
     }
-    unsigned int uiElements[sizeof(uiElementLocs)/32] = {};
-    for(unsigned int i=0; i<sizeof(uiElementLocs)/32; i++){
+    unsigned int uiElements[UI_ELEMENT_COUNT] = {};
+    for(unsigned int i=0; i<UI_ELEMENT_COUNT; i++){
         uiElements[i] = loadTexture(uiElementLocs[i]);
     }
     unsigned int uiBackground = loadTexture(backgroundLoc);
@@ -1521,7 +1556,7 @@ int main(int argc, char* argv[]) {
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         
         if(error != ""){
-            RenderText(textProgram, textVAO, textVBO, error, 10.0f, (float)SCR_HEIGHT - 20.0f, 0.35f, glm::vec3(0.8f, 0.2f, 0.2f));
+            RenderText(textProgram, textVAO, textVBO, error, ui(10.0f), (float)SCR_HEIGHT - ui(20.0f), 0.35f * contentScale, glm::vec3(0.8f, 0.2f, 0.2f));
             errorTime += deltaTime;
             if(errorTime >= 7.0f) error = "";
         }
@@ -1529,11 +1564,11 @@ int main(int argc, char* argv[]) {
         if(tooltip != ""){
             tooltipTime += deltaTime;
             if(tooltipTime >= 0.5f){
-                RenderText(textProgram, textVAO, textVBO, tooltip, lastX, (float)SCR_HEIGHT - lastY, 0.35f, glm::vec3(0.8f, 0.8f, 0.8f));
+                RenderText(textProgram, textVAO, textVBO, tooltip, lastX, (float)SCR_HEIGHT - lastY, 0.35f * contentScale, glm::vec3(0.8f, 0.8f, 0.8f));
                 glUseProgram(spriteProgram);
                 glm::mat4 spriteModel = glm::mat4(1.0f);
-                spriteModel = glm::translate(spriteModel, glm::vec3(lastX - 2.5f, (float)SCR_HEIGHT - lastY - 2.5f, 0.0f));
-                spriteModel = glm::scale(spriteModel, glm::vec3(8.5f * tooltip.size(), 20.0f, 1.0f));
+                spriteModel = glm::translate(spriteModel, glm::vec3(lastX - ui(2.5f), (float)SCR_HEIGHT - lastY - ui(2.5f), 0.0f));
+                spriteModel = glm::scale(spriteModel, glm::vec3(ui(8.5f) * tooltip.size(), ui(20.0f), 1.0f));
                 glm::mat4 textProj = glm::ortho(0.0f, (float)SCR_WIDTH, 0.0f, (float)SCR_HEIGHT);
                 glUniformMatrix4fv(glGetUniformLocation(spriteProgram, "model"), 1, GL_FALSE, &spriteModel[0][0]);
                 glUniformMatrix4fv(glGetUniformLocation(spriteProgram, "projection"), 1, GL_FALSE, &textProj[0][0]);
@@ -1548,8 +1583,8 @@ int main(int argc, char* argv[]) {
         glm::mat4 orthoProj = glm::ortho(0.0f, (float)SCR_WIDTH, (float)SCR_HEIGHT, 0.0f, -1.0f, 1.0f);
         glm::mat4 spriteModel = glm::mat4(1.0f);
         glUseProgram(spriteProgram);
-        spriteModel = glm::translate(spriteModel, glm::vec3(10.0f, (float)SCR_HEIGHT - 10.0f, 0.0f));
-        spriteModel = glm::scale(spriteModel, glm::vec3(50.0f, -50.0f, 1.0f));
+        spriteModel = glm::translate(spriteModel, glm::vec3(ui(10.0f), (float)SCR_HEIGHT - ui(10.0f), 0.0f));
+        spriteModel = glm::scale(spriteModel, glm::vec3(ui(50.0f), ui(-50.0f), 1.0f));
         glUniformMatrix4fv(glGetUniformLocation(spriteProgram, "model"), 1, GL_FALSE, &spriteModel[0][0]);
         glUniformMatrix4fv(glGetUniformLocation(spriteProgram, "projection"), 1, GL_FALSE, &orthoProj[0][0]);
         glUniform3fv(glGetUniformLocation(spriteProgram, "extraColor"), 1, &extraColors[0][0]);
@@ -1578,8 +1613,8 @@ int main(int argc, char* argv[]) {
         glBindTexture(GL_TEXTURE_2D, uiElements[6]);
         glDrawArrays(GL_TRIANGLES, 0, 6);
         spriteModel = glm::mat4(1.0f);
-        spriteModel = glm::translate(spriteModel, glm::vec3((float)SCR_WIDTH - 60.0f, (float)SCR_HEIGHT - 10.0f, 0.0f));
-        spriteModel = glm::scale(spriteModel, glm::vec3(50.0f, -50.0f, 1.0f));
+        spriteModel = glm::translate(spriteModel, glm::vec3((float)SCR_WIDTH - ui(60.0f), (float)SCR_HEIGHT - ui(10.0f), 0.0f));
+        spriteModel = glm::scale(spriteModel, glm::vec3(ui(50.0f), ui(-50.0f), 1.0f));
         glUniformMatrix4fv(glGetUniformLocation(spriteProgram, "model"), 1, GL_FALSE, &spriteModel[0][0]);
         glUniform3fv(glGetUniformLocation(spriteProgram, "extraColor"), 1, &extraColors[4][0]);
         glBindTexture(GL_TEXTURE_2D, uiElements[4]);
@@ -1602,8 +1637,8 @@ int main(int argc, char* argv[]) {
 
         if(showMaterialUI){
             spriteModel = glm::mat4(1.0f);
-            spriteModel = glm::translate(spriteModel, glm::vec3((float)SCR_WIDTH / 4.0f + 20.0f, (float)SCR_HEIGHT / 4.0f + 20.0f, 0.0f));
-            spriteModel = glm::scale(spriteModel, glm::vec3(50.0f, 50.0f, 1.0f));
+            spriteModel = glm::translate(spriteModel, glm::vec3((float)SCR_WIDTH / 4.0f + ui(20.0f), (float)SCR_HEIGHT / 4.0f + ui(20.0f), 0.0f));
+            spriteModel = glm::scale(spriteModel, glm::vec3(ui(50.0f), ui(50.0f), 1.0f));
             glUniformMatrix4fv(glGetUniformLocation(spriteProgram, "model"), 1, GL_FALSE, &spriteModel[0][0]);
             glUniform3fv(glGetUniformLocation(spriteProgram, "extraColor"), 1, &extraColors[9][0]);
             glBindTexture(GL_TEXTURE_2D, albedo);
@@ -1628,26 +1663,26 @@ int main(int argc, char* argv[]) {
             glUniform3fv(glGetUniformLocation(spriteProgram, "extraColor"), 1, &extraColors[13][0]);
             glBindTexture(GL_TEXTURE_2D, ao);
             glDrawArrays(GL_TRIANGLES, 0, 6);
-            RenderText(textProgram, textVAO, textVBO, "Base Color", (float)SCR_WIDTH / 4.0f + 80.0f, (float)SCR_HEIGHT * 3.0f / 4.0f - 50.0f, 0.4f, glm::vec3(0.8f, 0.8f, 0.8f) * extraColors[9]);
+            RenderText(textProgram, textVAO, textVBO, "Base Color", (float)SCR_WIDTH / 4.0f + ui(80.0f), (float)SCR_HEIGHT * 3.0f / 4.0f - ui(50.0f), 0.4f * contentScale, glm::vec3(0.8f, 0.8f, 0.8f) * extraColors[9]);
             if(isMetallic){
-                RenderText(textProgram, textVAO, textVBO, "Metalness", (float)SCR_WIDTH / 4.0f + 80.0f, (float)SCR_HEIGHT * 3.0f / 4.0f - 110.0f, 0.4f, glm::vec3(0.8f, 0.8f, 0.8f) * extraColors[10]);
-                RenderText(textProgram, textVAO, textVBO, "Roughness", (float)SCR_WIDTH / 4.0f + 80.0f, (float)SCR_HEIGHT * 3.0f / 4.0f - 230.0f, 0.4f, glm::vec3(0.8f, 0.8f, 0.8f) * extraColors[12]);
+                RenderText(textProgram, textVAO, textVBO, "Metalness", (float)SCR_WIDTH / 4.0f + ui(80.0f), (float)SCR_HEIGHT * 3.0f / 4.0f - ui(110.0f), 0.4f * contentScale, glm::vec3(0.8f, 0.8f, 0.8f) * extraColors[10]);
+                RenderText(textProgram, textVAO, textVBO, "Roughness", (float)SCR_WIDTH / 4.0f + ui(80.0f), (float)SCR_HEIGHT * 3.0f / 4.0f - ui(230.0f), 0.4f * contentScale, glm::vec3(0.8f, 0.8f, 0.8f) * extraColors[12]);
             }
             else{
-                RenderText(textProgram, textVAO, textVBO, "Specular", (float)SCR_WIDTH / 4.0f + 80.0f, (float)SCR_HEIGHT * 3.0f / 4.0f - 110.0f, 0.4f, glm::vec3(0.8f, 0.8f, 0.8f) * extraColors[10]);
-                RenderText(textProgram, textVAO, textVBO, "Glossiness", (float)SCR_WIDTH / 4.0f + 80.0f, (float)SCR_HEIGHT * 3.0f / 4.0f - 230.0f, 0.4f, glm::vec3(0.8f, 0.8f, 0.8f) * extraColors[12]);
+                RenderText(textProgram, textVAO, textVBO, "Specular", (float)SCR_WIDTH / 4.0f + ui(80.0f), (float)SCR_HEIGHT * 3.0f / 4.0f - ui(110.0f), 0.4f * contentScale, glm::vec3(0.8f, 0.8f, 0.8f) * extraColors[10]);
+                RenderText(textProgram, textVAO, textVBO, "Glossiness", (float)SCR_WIDTH / 4.0f + ui(80.0f), (float)SCR_HEIGHT * 3.0f / 4.0f - ui(230.0f), 0.4f * contentScale, glm::vec3(0.8f, 0.8f, 0.8f) * extraColors[12]);
             }
-            RenderText(textProgram, textVAO, textVBO, "Normal Map", (float)SCR_WIDTH / 4.0f + 80.0f, (float)SCR_HEIGHT * 3.0f / 4.0f - 170.0f, 0.4f, glm::vec3(0.8f, 0.8f, 0.8f) * extraColors[11]);
-            RenderText(textProgram, textVAO, textVBO, "Ambient Occlusion", (float)SCR_WIDTH / 4.0f + 80.0f, (float)SCR_HEIGHT * 3.0f / 4.0f - 290.0f, 0.4f, glm::vec3(0.8f, 0.8f, 0.8f) * extraColors[13]);
-            RenderText(textProgram, textVAO, textVBO, "Metallic", (float)SCR_WIDTH * 2.25f / 4.0f - 25.0f, (float)SCR_HEIGHT * 0.5f / 4.0f + 45.0f, 0.3f, glm::vec3(0.8f, 0.8f, 0.8f) * extraColors[19]);
-            RenderText(textProgram, textVAO, textVBO, "Specular", (float)SCR_WIDTH * 2.25f / 4.0f + 75.0f, (float)SCR_HEIGHT * 0.5f / 4.0f + 45.0f, 0.3f, glm::vec3(0.8f, 0.8f, 0.8f) * extraColors[20]);
+            RenderText(textProgram, textVAO, textVBO, "Normal Map", (float)SCR_WIDTH / 4.0f + ui(80.0f), (float)SCR_HEIGHT * 3.0f / 4.0f - ui(170.0f), 0.4f * contentScale, glm::vec3(0.8f, 0.8f, 0.8f) * extraColors[11]);
+            RenderText(textProgram, textVAO, textVBO, "Ambient Occlusion", (float)SCR_WIDTH / 4.0f + ui(80.0f), (float)SCR_HEIGHT * 3.0f / 4.0f - ui(290.0f), 0.4f * contentScale, glm::vec3(0.8f, 0.8f, 0.8f) * extraColors[13]);
+            RenderText(textProgram, textVAO, textVBO, "Metallic", (float)SCR_WIDTH * 2.25f / 4.0f - ui(25.0f), (float)SCR_HEIGHT * 0.5f / 4.0f + ui(45.0f), 0.3f * contentScale, glm::vec3(0.8f, 0.8f, 0.8f) * extraColors[19]);
+            RenderText(textProgram, textVAO, textVBO, "Specular", (float)SCR_WIDTH * 2.25f / 4.0f + ui(75.0f), (float)SCR_HEIGHT * 0.5f / 4.0f + ui(45.0f), 0.3f * contentScale, glm::vec3(0.8f, 0.8f, 0.8f) * extraColors[20]);
             glUseProgram(spriteProgram);
             glBindVertexArray(spriteVAO);
             glUniformMatrix4fv(glGetUniformLocation(spriteProgram, "projection"), 1, GL_FALSE, &orthoProj[0][0]);
             glActiveTexture(GL_TEXTURE0);
             spriteModel = glm::mat4(1.0f);
-            spriteModel = glm::translate(spriteModel, glm::vec3((float)SCR_WIDTH * 3.0f / 4.0f - 30.0f, (float)SCR_HEIGHT / 4.0f + 20.0f, 0.0f));
-            spriteModel = glm::scale(spriteModel, glm::vec3(20.0f, 20.0f, 1.0f));
+            spriteModel = glm::translate(spriteModel, glm::vec3((float)SCR_WIDTH * 3.0f / 4.0f - ui(30.0f), (float)SCR_HEIGHT / 4.0f + ui(20.0f), 0.0f));
+            spriteModel = glm::scale(spriteModel, glm::vec3(ui(20.0f), ui(20.0f), 1.0f));
             glUniformMatrix4fv(glGetUniformLocation(spriteProgram, "model"), 1, GL_FALSE, &spriteModel[0][0]);
             glUniform3fv(glGetUniformLocation(spriteProgram, "extraColor"), 1, &extraColors[8][0]);
             glBindTexture(GL_TEXTURE_2D, uiElements[8]);
@@ -1674,8 +1709,8 @@ int main(int argc, char* argv[]) {
             glBindTexture(GL_TEXTURE_2D, uiElements[18]);
             glDrawArrays(GL_TRIANGLES, 0, 6);
             spriteModel = glm::mat4(1.0f);
-            spriteModel = glm::translate(spriteModel, glm::vec3((float)SCR_WIDTH * 2.25f / 4.0f - 50.0, (float)SCR_HEIGHT * 3.5f / 4.0f - 30.0f, 0.0f));
-            spriteModel = glm::scale(spriteModel, glm::vec3(100.0f, -40.0f, 1.0f));
+            spriteModel = glm::translate(spriteModel, glm::vec3((float)SCR_WIDTH * 2.25f / 4.0f - ui(50.0f), (float)SCR_HEIGHT * 3.5f / 4.0f - ui(30.0f), 0.0f));
+            spriteModel = glm::scale(spriteModel, glm::vec3(ui(100.0f), ui(-40.0f), 1.0f));
             glUniformMatrix4fv(glGetUniformLocation(spriteProgram, "model"), 1, GL_FALSE, &spriteModel[0][0]);
             glUniform3fv(glGetUniformLocation(spriteProgram, "extraColor"), 1, &extraColors[19][0]);
             if(isMetallic) glBindTexture(GL_TEXTURE_2D, uiElements[20]);
@@ -1822,82 +1857,83 @@ void hoverElement(int elementNum){
     return;
 }
 void mouseCallback(GLFWwindow* window, double xposIn, double yposIn){
+    double xpos = xposIn * contentScale;
+    double ypos = yposIn * contentScale;
     if(glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_RELEASE) {
-        lastX = xposIn;
-        lastY = yposIn;
+        lastX = xpos;
+        lastY = ypos;
         firstMouse = true;
         if(showMaterialUI){
-            if(yposIn > SCR_HEIGHT / 4.0f + 20.0f && yposIn < SCR_HEIGHT / 4.0f + 40.0f && xposIn > SCR_WIDTH * 3.0f / 4.0f - 30.0f && xposIn < SCR_WIDTH * 3.0f / 4.0f - 10.0f){
+            if(ypos > SCR_HEIGHT / 4.0f + ui(20.0f) && ypos < SCR_HEIGHT / 4.0f + ui(40.0f) && xpos > SCR_WIDTH * 3.0f / 4.0f - ui(30.0f) && xpos < SCR_WIDTH * 3.0f / 4.0f - ui(10.0f)){
                 hoverElement(8); highlightingUI = true;
             }
-            else if(yposIn > SCR_HEIGHT * 29.0f / 36.0f || yposIn < SCR_HEIGHT / 4.0f || xposIn < SCR_WIDTH / 4.0f || xposIn > SCR_WIDTH * 3.0f / 4.0f){
+            else if(ypos > SCR_HEIGHT * 29.0f / 36.0f || ypos < SCR_HEIGHT / 4.0f || xpos < SCR_WIDTH / 4.0f || xpos > SCR_WIDTH * 3.0f / 4.0f){
                 hoverElement(-1); currentElement = 8; highlightingUI = true;
             }
-            else if(yposIn < SCR_HEIGHT / 4.0f + 95.0f && yposIn > SCR_HEIGHT / 4.0f + 45.0f && xposIn > SCR_WIDTH * 3.0f / 4.0f - 60.0f && xposIn < SCR_WIDTH * 3.0f / 4.0f - 10.0f){
+            else if(ypos < SCR_HEIGHT / 4.0f + ui(95.0f) && ypos > SCR_HEIGHT / 4.0f + ui(45.0f) && xpos > SCR_WIDTH * 3.0f / 4.0f - ui(60.0f) && xpos < SCR_WIDTH * 3.0f / 4.0f - ui(10.0f)){
                 hoverElement(14); highlightingUI = true; tooltip = "Upload .zip";
             }
-            else if(yposIn < SCR_HEIGHT / 4.0f + 150.0f && yposIn > SCR_HEIGHT / 4.0f + 100.0f && xposIn > SCR_WIDTH * 3.0f / 4.0f - 60.0f && xposIn < SCR_WIDTH * 3.0f / 4.0f - 10.0f){
+            else if(ypos < SCR_HEIGHT / 4.0f + ui(150.0f) && ypos > SCR_HEIGHT / 4.0f + ui(100.0f) && xpos > SCR_WIDTH * 3.0f / 4.0f - ui(60.0f) && xpos < SCR_WIDTH * 3.0f / 4.0f - ui(10.0f)){
                 hoverElement(15); highlightingUI = true; tooltip = "Save .mat";
             }
-            else if(yposIn < SCR_HEIGHT / 4.0f + 205.0f && yposIn > SCR_HEIGHT / 4.0f + 155.0f && xposIn > SCR_WIDTH * 3.0f / 4.0f - 60.0f && xposIn < SCR_WIDTH * 3.0f / 4.0f - 10.0f){
+            else if(ypos < SCR_HEIGHT / 4.0f + ui(205.0f) && ypos > SCR_HEIGHT / 4.0f + ui(155.0f) && xpos > SCR_WIDTH * 3.0f / 4.0f - ui(60.0f) && xpos < SCR_WIDTH * 3.0f / 4.0f - ui(10.0f)){
                 hoverElement(16); highlightingUI = true; tooltip = "Upload .mat";
             }
-            else if(yposIn < SCR_HEIGHT / 4.0f + 260.0f && yposIn > SCR_HEIGHT / 4.0f + 210.0f && xposIn > SCR_WIDTH * 3.0f / 4.0f - 60.0f && xposIn < SCR_WIDTH * 3.0f / 4.0f - 10.0f){
+            else if(ypos < SCR_HEIGHT / 4.0f + ui(260.0f) && ypos > SCR_HEIGHT / 4.0f + ui(210.0f) && xpos > SCR_WIDTH * 3.0f / 4.0f - ui(60.0f) && xpos < SCR_WIDTH * 3.0f / 4.0f - ui(10.0f)){
                 hoverElement(18); highlightingUI = true; tooltip = "Download textures";
             }
-            //(float)SCR_WIDTH * 2.25f / 4.0f - 50.0, (float)SCR_HEIGHT * 3.5f / 4.0f - 30.0f
-            else if(yposIn > SCR_HEIGHT * 3.5f / 4.0f - 75.0f && yposIn < SCR_HEIGHT * 3.5 / 4.0f - 25.0f && xposIn > SCR_WIDTH * 2.25f / 4.0f - 50.0f && xposIn < SCR_WIDTH * 2.25f / 4.0f + 50.0f){
+            else if(ypos > SCR_HEIGHT * 3.5f / 4.0f - ui(75.0f) && ypos < SCR_HEIGHT * 3.5 / 4.0f - ui(25.0f) && xpos > SCR_WIDTH * 2.25f / 4.0f - ui(50.0f) && xpos < SCR_WIDTH * 2.25f / 4.0f + ui(50.0f)){
                 hoverElement(19); highlightingUI = true; tooltip = "Use metallic workflow";
             }
-            else if(yposIn > SCR_HEIGHT * 3.5f / 4.0f - 75.0f && yposIn < SCR_HEIGHT * 3.5 / 4.0f - 25.0f && xposIn > SCR_WIDTH * 2.25f / 4.0f + 50.0f && xposIn < SCR_WIDTH * 2.25f / 4.0f + 150.0f){
+            else if(ypos > SCR_HEIGHT * 3.5f / 4.0f - ui(75.0f) && ypos < SCR_HEIGHT * 3.5 / 4.0f - ui(25.0f) && xpos > SCR_WIDTH * 2.25f / 4.0f + ui(50.0f) && xpos < SCR_WIDTH * 2.25f / 4.0f + ui(150.0f)){
                 hoverElement(20); highlightingUI = true; tooltip = "Use specular workflow";
             }
-            else if(xposIn > SCR_WIDTH / 4.0f + 20.0f && xposIn < SCR_WIDTH / 4.0f + 70.0f){
-                if(yposIn > SCR_HEIGHT / 4.0f + 20.0f && yposIn < SCR_HEIGHT / 4.0f + 70.0f) {
+            else if(xpos > SCR_WIDTH / 4.0f + ui(20.0f) && xpos < SCR_WIDTH / 4.0f + ui(70.0f)){
+                if(ypos > SCR_HEIGHT / 4.0f + ui(20.0f) && ypos < SCR_HEIGHT / 4.0f + ui(70.0f)) {
                     hoverElement(9); highlightingUI = true;
                 }
-                else if(yposIn > SCR_HEIGHT / 4.0f + 80.0f && yposIn < SCR_HEIGHT / 4.0f + 130.0f) {
+                else if(ypos > SCR_HEIGHT / 4.0f + ui(80.0f) && ypos < SCR_HEIGHT / 4.0f + ui(130.0f)) {
                     hoverElement(10); highlightingUI = true;
                 }
-                else if(yposIn > SCR_HEIGHT / 4.0f + 140.0f && yposIn < SCR_HEIGHT / 4.0f + 190.0f) {
+                else if(ypos > SCR_HEIGHT / 4.0f + ui(140.0f) && ypos < SCR_HEIGHT / 4.0f + ui(190.0f)) {
                     hoverElement(11); highlightingUI = true;
                 }
-                else if(yposIn > SCR_HEIGHT / 4.0f + 200.0f && yposIn < SCR_HEIGHT / 4.0f + 250.0f) {
+                else if(ypos > SCR_HEIGHT / 4.0f + ui(200.0f) && ypos < SCR_HEIGHT / 4.0f + ui(250.0f)) {
                     hoverElement(12); highlightingUI = true;
                 }
-                else if(yposIn > SCR_HEIGHT / 4.0f + 260.0f && yposIn < SCR_HEIGHT / 4.0f + 310.0f) {
+                else if(ypos > SCR_HEIGHT / 4.0f + ui(260.0f) && ypos < SCR_HEIGHT / 4.0f + ui(310.0f)) {
                     hoverElement(13); highlightingUI = true;
                 }
                 else if(highlightingUI) {hoverElement(-1); highlightingUI = false;}
             }
             else if(highlightingUI) {hoverElement(-1); highlightingUI = false;}
         }
-        else if(yposIn > SCR_HEIGHT - 60.0f && yposIn < SCR_HEIGHT - 10.0f){
-            if(xposIn > 10.0f && xposIn < 60.0f) {hoverElement(0); highlightingUI = true;}
-            else if(xposIn > 60.0f && xposIn < 110.0f) {hoverElement(1); highlightingUI = true;}
-            else if(xposIn > 110.0f && xposIn < 160.0f) {hoverElement(2); highlightingUI = true;}
-            else if(xposIn > 160.0f && xposIn < 210.0f) {hoverElement(3); highlightingUI = true;}
-            else if(xposIn > 210.0f && xposIn < 260.0f) {hoverElement(6); highlightingUI = true; tooltip = "Upload HDRI environment";}
-            else if(xposIn > SCR_WIDTH - 60.0f && xposIn < SCR_WIDTH - 10.0f) {hoverElement(4); highlightingUI = true;}
-            else if(xposIn > SCR_WIDTH - 110.0f && xposIn < SCR_WIDTH - 60.0f) {hoverElement(5); highlightingUI = true;}
-            else if(xposIn > SCR_WIDTH - 160.0f && xposIn < SCR_WIDTH - 110.0f) {hoverElement(17); highlightingUI = true;}
-            else if(xposIn > SCR_WIDTH - 210.0f && xposIn < SCR_WIDTH - 160.0f) {hoverElement(7); highlightingUI = true; tooltip = "Change material";}
+        else if(ypos > SCR_HEIGHT - ui(60.0f) && ypos < SCR_HEIGHT - ui(10.0f)){
+            if(xpos > ui(10.0f) && xpos < ui(60.0f)) {hoverElement(0); highlightingUI = true;}
+            else if(xpos > ui(60.0f) && xpos < ui(110.0f)) {hoverElement(1); highlightingUI = true;}
+            else if(xpos > ui(110.0f) && xpos < ui(160.0f)) {hoverElement(2); highlightingUI = true;}
+            else if(xpos > ui(160.0f) && xpos < ui(210.0f)) {hoverElement(3); highlightingUI = true;}
+            else if(xpos > ui(210.0f) && xpos < ui(260.0f)) {hoverElement(6); highlightingUI = true; tooltip = "Upload HDRI environment";}
+            else if(xpos > SCR_WIDTH - ui(60.0f) && xpos < SCR_WIDTH - ui(10.0f)) {hoverElement(4); highlightingUI = true;}
+            else if(xpos > SCR_WIDTH - ui(110.0f) && xpos < SCR_WIDTH - ui(60.0f)) {hoverElement(5); highlightingUI = true;}
+            else if(xpos > SCR_WIDTH - ui(160.0f) && xpos < SCR_WIDTH - ui(110.0f)) {hoverElement(17); highlightingUI = true;}
+            else if(xpos > SCR_WIDTH - ui(210.0f) && xpos < SCR_WIDTH - ui(160.0f)) {hoverElement(7); highlightingUI = true; tooltip = "Change material";}
             else if(highlightingUI) {hoverElement(-1); highlightingUI = false;}
         }
         else if(highlightingUI) {hoverElement(-1); highlightingUI = false;}
         return;
     }
-    float xpos = static_cast<float>(xposIn);
-    float ypos = static_cast<float>(yposIn);
+    float xposf = static_cast<float>(xpos);
+    float yposf = static_cast<float>(ypos);
     if (firstMouse){
-        lastX = xpos;
-        lastY = ypos;
+        lastX = xposf;
+        lastY = yposf;
         firstMouse = false;
     }
-    float xOffset = xpos - lastX;
-    float yOffset = lastY - ypos;
-    lastX = xpos;
-    lastY = ypos;
+    float xOffset = xposf - lastX;
+    float yOffset = lastY - yposf;
+    lastX = xposf;
+    lastY = yposf;
     float sensitivity = 0.007f;
     xOffset *= sensitivity;
     yOffset *= sensitivity;

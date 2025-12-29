@@ -1,11 +1,11 @@
 #version 330 core
 out vec4 FragColor;
-in vec3 localPos;
+in vec3 TexCoords;
 uniform samplerCube skybox;
 const float PI = 3.14159265359;
 
 void main(){
-    vec3 normal = normalize(localPos);
+    vec3 normal = normalize(TexCoords);
     vec3 irradiance = vec3(0.0);
     vec3 up = vec3(0.0, 1.0, 0.0);
     vec3 right = normalize(cross(up, normal));

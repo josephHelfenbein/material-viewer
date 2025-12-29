@@ -132,7 +132,12 @@ To compile the project on Windows, you'll need:
     - `mingw-w64-ucrt-x86_64-freetype` (for font rendering)
     - `mingw-w64-ucrt-x86_64-glfw` (for creating windows, OpenGL contexts)
     - `mingw-w64-ucrt-x86_64-cmake` (for building)
-3. Run the `Debug MaterialViewer (Windows)` configuration in VSCode.
+3. **Build** - Run the following commands from the project root:
+   ```bash
+   cmake -S . -B build -G "MinGW Makefiles"
+   cmake --build build
+   ```
+4. Or run the `Debug MaterialViewer (Windows)` configuration in VSCode.
 
 ### Linux
 
@@ -147,7 +152,32 @@ To compile the project on Linux, you'll need:
     - `qt5-qmake` (for compiling Qt applications)
     - `libqt5widgets5`, `libqt5gui5`, `libqt5core5a` (for UI elements)
     - `cmake` (for building)
-3. Run the `Debug MaterialViewer (Linux)` configuration in VSCode.
+3. **Build** - Run the following commands from the project root:
+   ```bash
+   cmake -S . -B build
+   cmake --build build
+   ```
+4. Or run the `Debug MaterialViewer (Linux)` configuration in VSCode.
+
+### macOS
+
+To compile the project on macOS, you'll need:
+1. **Xcode Command Line Tools** - Install with:
+   ```bash
+   xcode-select --install
+   ```
+2. **Homebrew** - Install [Homebrew](https://brew.sh/) if not already installed.
+3. **Libraries** - Use Homebrew to install the required dependencies:
+   ```bash
+   brew install cmake glfw freetype libzip zstd qt@5
+   ```
+4. **Build** - Run the following commands from the project root:
+   ```bash
+   cmake -S . -B build
+   cmake --build build
+   ```
+5. The built executable will be at `build/materialviewer`.
+
 
 <!-- LICENSE -->
 ## License
