@@ -55,8 +55,8 @@ EOF
 
 # Copy icon if it exists
 if [ -f "${ICON_PATH}" ]; then
-    cp "${ICON_PATH}" "${APP_DIR}/materialviewer-logo.png"
-    ln -sf materialviewer-logo.png "${APP_DIR}/.DirIcon"
+    cp "${ICON_PATH}" "${APP_DIR}/materialviewer.png"
+    ln -sf materialviewer.png "${APP_DIR}/.DirIcon"
 fi
 
 # Bundle shared libraries
