@@ -94,12 +94,22 @@ To install **Material Viewer**, download the appropriate file from the [Releases
 
 ### Windows
 
-1. **Binary**: Download `MaterialViewer.exe` and run it directly. No installation required.
-2. **Installer**: Download `MaterialViewerInstaller.exe` and follow the setup wizard for a guided installation.
+1. **Installer**: Download `MaterialViewerInstaller.exe` and follow the setup wizard for a guided installation.
+2. **Binary**: Download `MaterialViewer.exe` and run it directly. No installation required.
+
+(For the installer, .mat files are automatically associated with the app)
 
 ### Linux
 
-1. **Binary (AppImage)**:
+1. **Installer**:
+    - Download `MaterialViewerLinuxInstall.zip` and extract it.
+    - Run the installation script as root:
+   ```bash
+   unzip MaterialViewerLinuxInstall.zip
+   cd MaterialViewerLinuxInstall
+   sudo ./install.sh
+   ```
+2. **Binary (AppImage)**:
     - Download `MaterialViewer-x86_64.AppImage`.
     - Make it executable:
    ```bash
@@ -109,15 +119,21 @@ To install **Material Viewer**, download the appropriate file from the [Releases
    ```bash
    ./MaterialViewer-x86_64.AppImage
    ```
-2. **Installer**:
-    - Download `MaterialViewerLinuxInstall.zip` and extract it.
-    - Run the installation script as root:
-   ```bash
-   unzip MaterialViewerLinuxInstall.zip
-   cd MaterialViewerLinuxInstall
-   sudo ./install.sh
-   ```
-     
+
+(For the installer, .mat files are automatically associated with the app)
+
+### macOS
+
+1. **Installer**:
+    - Download `MaterialViewer.dmg`.
+    - Open the DMG and drag `Material Viewer.app` to your Applications folder.
+    - On first launch, right-click the app and select "Open" to bypass Gatekeeper.
+2. **Binary (App Bundle)**:
+    - Download `MaterialViewer.app.zip` and extract it.
+    - Move `Material Viewer.app` to your Applications folder or run it directly.
+    - On first launch, right-click and select "Open" to bypass Gatekeeper.
+
+(For installer or binary, .mat files are automatically associated with the app)
 
 ## Prerequisites
 

@@ -48,9 +48,12 @@ if [ -f "${ICON_PATH}" ]; then
     sips -z 1024 1024 "${ICON_PATH}" --out "${APP_DIR}/Contents/Resources/icon.iconset/icon_512x512@2x.png" 2>/dev/null || true
     iconutil -c icns "${APP_DIR}/Contents/Resources/icon.iconset" -o "${APP_DIR}/Contents/Resources/materialviewer.icns" 2>/dev/null || true
     rm -rf "${APP_DIR}/Contents/Resources/icon.iconset"
+    
+    # Also create document icon for .mat files (same as app icon)
+    cp "${APP_DIR}/Contents/Resources/materialviewer.icns" "${APP_DIR}/Contents/Resources/mat-document.icns" 2>/dev/null || true
 fi
 
-# Create Info.plist
+# Create Info.plist with document type association for .mat files
 cat > "${APP_DIR}/Contents/Info.plist" << EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -76,6 +79,51 @@ cat > "${APP_DIR}/Contents/Info.plist" << EOF
     <true/>
     <key>NSSupportsAutomaticGraphicsSwitching</key>
     <true/>
+    
+    <!-- Document Types - Associates .mat files with Material Viewer -->
+    <key>CFBundleDocumentTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleTypeName</key>
+            <string>Material Viewer Document</string>
+            <key>CFBundleTypeRole</key>
+            <string>Editor</string>
+            <key>CFBundleTypeIconFile</key>
+            <string>mat-document</string>
+            <key>LSItemContentTypes</key>
+            <array>
+                <string>com.materialviewer.mat</string>
+            </array>
+            <key>LSHandlerRank</key>
+            <string>Owner</string>
+        </dict>
+    </array>
+    
+    <!-- Exported UTI - Declares the .mat file type -->
+    <key>UTExportedTypeDeclarations</key>
+    <array>
+        <dict>
+            <key>UTTypeIdentifier</key>
+            <string>com.materialviewer.mat</string>
+            <key>UTTypeDescription</key>
+            <string>Material Viewer Document</string>
+            <key>UTTypeConformsTo</key>
+            <array>
+                <string>public.data</string>
+            </array>
+            <key>UTTypeIconFile</key>
+            <string>mat-document</string>
+            <key>UTTypeTagSpecification</key>
+            <dict>
+                <key>public.filename-extension</key>
+                <array>
+                    <string>mat</string>
+                </array>
+                <key>public.mime-type</key>
+                <string>application/x-materialviewer</string>
+            </dict>
+        </dict>
+    </array>
 </dict>
 </plist>
 EOF
@@ -147,4 +195,7 @@ echo ""
 echo "Created ${APP_DIR}"
 echo ""
 echo "To create a DMG for distribution, run:"
+echo "  scripts/create-macos-dmg.sh"
+echo ""
+echo "Or manually:"
 echo "  hdiutil create -volname 'Material Viewer' -srcfolder '${APP_DIR}' -ov -format UDZO ${PROJECT_ROOT}/build/MaterialViewer.dmg"
