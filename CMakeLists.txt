@@ -111,6 +111,7 @@ if (UNIX AND NOT APPLE)
             ${ZIP_LIB}
             dl
             m
+            pthread
     )
 
 endif()
