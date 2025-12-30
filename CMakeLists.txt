@@ -23,6 +23,7 @@ add_executable(materialviewer ${SOURCES})
 target_include_directories(materialviewer
     PUBLIC
         "${CMAKE_SOURCE_DIR}/include"
+        "${CMAKE_SOURCE_DIR}/include/glm"
         "${CMAKE_SOURCE_DIR}/include/freetype/include"
         "${CMAKE_SOURCE_DIR}/src"
 )
