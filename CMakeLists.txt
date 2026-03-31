@@ -8,10 +8,25 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/build")
 
+find_program(PYTHON3_EXEC NAMES python3 python REQUIRED)
+
+set(EMBEDDED_RESOURCES_H   "${CMAKE_BINARY_DIR}/embedded_resources.h")
+set(EMBEDDED_RESOURCES_CPP "${CMAKE_BINARY_DIR}/embedded_resources.cpp")
+
+add_custom_command(
+    OUTPUT "${EMBEDDED_RESOURCES_CPP}" "${EMBEDDED_RESOURCES_H}"
+    COMMAND "${PYTHON3_EXEC}"
+        "${CMAKE_SOURCE_DIR}/scripts/embed_resources.py"
+        "${CMAKE_SOURCE_DIR}/src"
+        "${EMBEDDED_RESOURCES_H}"
+        "${EMBEDDED_RESOURCES_CPP}"
+    COMMENT "Generating embedded resources"
+)
+
 set(SOURCES
     ${CMAKE_SOURCE_DIR}/src/main.cpp
     ${CMAKE_SOURCE_DIR}/src/glad.c
-    ${CMAKE_SOURCE_DIR}/src/embedded_resources.cpp
+    ${EMBEDDED_RESOURCES_CPP}
 )
 
 if (WIN32)
@@ -26,6 +41,7 @@ target_include_directories(materialviewer
         "${CMAKE_SOURCE_DIR}/include/glm"
         "${CMAKE_SOURCE_DIR}/include/freetype/include"
         "${CMAKE_SOURCE_DIR}/src"
+        "${CMAKE_BINARY_DIR}"
 )
 
 if (WIN32)

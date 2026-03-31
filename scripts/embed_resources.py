@@ -71,13 +71,12 @@ const Resource* getResource(const std::string& path);
 
 ''')
         
-        # Generate INCBIN declarations for each resource
-        # Use paths relative to the source file location
+        # Generate INCBIN declarations using absolute paths so the .cpp
+        # can live anywhere (e.g. the build directory).
         for rel_path, filepath in resources:
             var_name = sanitize_name(str(rel_path).replace('\\', '_').replace('/', '_'))
-            # Path relative to source file - just use the relative path from src/
-            inc_path = str(rel_path).replace('\\', '/')
-            f.write(f'INCBIN({var_name}, "{inc_path}");\n')
+            abs_path = str(filepath.resolve()).replace('\\', '/')
+            f.write(f'INCBIN({var_name}, "{abs_path}");\n')
         
         f.write('''
 namespace EmbeddedResources {
