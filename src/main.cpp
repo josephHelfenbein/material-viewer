@@ -106,8 +106,10 @@ char* OpenFileDialogMaterial(){ return OpenFileDialogImpl("Material Files (*.mat
 static QApplication* getQApp(){
     static int argc = 0;
     static char* argv[] = {nullptr};
-    // Force XCB platform
+#if defined(__linux__)
+    // Force XCB platform on Linux
     qputenv("QT_QPA_PLATFORM", "xcb");
+#endif
     static QApplication app(argc, argv);
     QApplication::setApplicationName("Material Viewer");
     return &app;
