@@ -101,6 +101,8 @@ To install **Material Viewer**, download the appropriate file from the [Releases
 
 ### Linux
 
+**Note:** File dialogs use X11 (XCB). If you are on a Wayland desktop, XWayland must be installed (it is included by default on most distributions such as Fedora, Ubuntu, and Linux Mint).
+
 1. **Installer**:
     - Download `MaterialViewerLinuxInstall.zip` and extract it.
     - Run the installation script as root:

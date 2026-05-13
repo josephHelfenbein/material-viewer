@@ -86,7 +86,7 @@ QT_PLUGIN_PATH=$(qmake -query QT_INSTALL_PLUGINS 2>/dev/null || echo "")
 if [ -n "$QT_PLUGIN_PATH" ] && [ -d "$QT_PLUGIN_PATH" ]; then
     echo "Bundling Qt plugins..."
     mkdir -p "${APP_DIR}/usr/lib/qt5/plugins"
-    for plugin_type in platforms xcbglintegrations; do
+    for plugin_type in platforms xcbglintegrations platformthemes; do
         if [ -d "$QT_PLUGIN_PATH/$plugin_type" ]; then
             cp -r "$QT_PLUGIN_PATH/$plugin_type" "${APP_DIR}/usr/lib/qt5/plugins/"
         fi

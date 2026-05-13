@@ -24,7 +24,9 @@
 #include <unordered_set>
 #include <regex>
 #include <algorithm>
+#include <array>
 #include <cstdlib>
+#include <filesystem>
 #include "embedded_resources.h"
 
 #if defined(__APPLE__)
@@ -36,7 +38,7 @@
 #include <windows.h>
 #include <commdlg.h>
 #include <direct.h>
-char* OpenFileDialog(){
+char* OpenFileDialogImpl(const char* filter){
     static char filePath[256];
     char currentDir[256];
     _getcwd(currentDir, sizeof(currentDir));
@@ -47,12 +49,12 @@ char* OpenFileDialog(){
     ofn.lpstrFile = filePath;
     ofn.lpstrFile[0] = '\0';
     ofn.nMaxFile = sizeof(filePath);
-    ofn.lpstrFilter = "HDR Files\0*.hdr\0""All Image Files\0*.hdr;*.png;*.jpg;*.jpeg;*.bmp\0";
+    ofn.lpstrFilter = filter;
     ofn.nFilterIndex = 1;
     ofn.lpstrFileTitle = NULL;
     ofn.nMaxFileTitle = 0;
     ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST;
-    if(GetOpenFileNameA(&ofn)) {
+    if (GetOpenFileNameA(&ofn)) {
         _chdir(currentDir);
         return filePath;
     }
@@ -61,7 +63,10 @@ char* OpenFileDialog(){
         return nullptr;
     }
 }
-char* OpenFileDialogTex(){
+char* OpenFileDialog(){ return OpenFileDialogImpl("HDR Files\0*.hdr\0""All Image Files\0*.hdr;*.png;*.jpg;*.jpeg;*.bmp\0"); }
+char* OpenFileDialogTex(){ return OpenFileDialogImpl("All Image Files\0*.png;*.jpg;*.jpeg;*.bmp\0"); }
+char* OpenFileDialogZip(){ return OpenFileDialogImpl("Zip Files (*.zip)\0*.zip\0All Files (*.*)\0*.*\0"); }
+char* SaveFileDialogImpl(const char* filter, const char* defaultName, const char* extension){
     static char filePath[256];
     char currentDir[256];
     _getcwd(currentDir, sizeof(currentDir));
@@ -72,67 +77,17 @@ char* OpenFileDialogTex(){
     ofn.lpstrFile = filePath;
     ofn.lpstrFile[0] = '\0';
     ofn.nMaxFile = sizeof(filePath);
-    ofn.lpstrFilter = "All Image Files\0*.png;*.jpg;*.jpeg;*.bmp\0";
-    ofn.nFilterIndex = 1;
-    ofn.lpstrFileTitle = NULL;
-    ofn.nMaxFileTitle = 0;
-    ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST;
-    if(GetOpenFileNameA(&ofn)) {
-        _chdir(currentDir);
-        return filePath;
-    }
-    else {
-        _chdir(currentDir);
-        return nullptr;
-    }
-}
-char* OpenFileDialogZip(){
-    static char filePath[256];
-    char currentDir[256];
-    _getcwd(currentDir, sizeof(currentDir));
-    OPENFILENAMEA ofn;
-    ZeroMemory(&ofn, sizeof(ofn));
-    ofn.lStructSize = sizeof(ofn);
-    ofn.hwndOwner = nullptr;
-    ofn.lpstrFile = filePath;
-    ofn.lpstrFile[0] = '\0';
-    ofn.nMaxFile = sizeof(filePath);
-    ofn.lpstrFilter = "Zip Files (*.zip)\0*.zip\0All Files (*.*)\0*.*\0";
-    ofn.nFilterIndex = 1;
-    ofn.lpstrFileTitle = NULL;
-    ofn.nMaxFileTitle = 0;
-    ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST;
-    if(GetOpenFileNameA(&ofn)) {
-        _chdir(currentDir);
-        return filePath;
-    }
-    else {
-        _chdir(currentDir);
-        return nullptr;
-    }
-}
-char* SaveMatFileDialog(){
-    static char filePath[256];
-    char currentDir[256];
-    _getcwd(currentDir, sizeof(currentDir));
-    OPENFILENAMEA ofn;
-    ZeroMemory(&ofn, sizeof(ofn));
-    ofn.lStructSize = sizeof(ofn);
-    ofn.hwndOwner = nullptr;
-    ofn.lpstrFile = filePath;
-    ofn.lpstrFile[0] = '\0';
-    ofn.nMaxFile = sizeof(filePath);
-    ofn.lpstrFilter = "Material Files (*.mat)\0*.mat\0All Files (*.*)\0*.*\0";
+    ofn.lpstrFilter = filter;
     ofn.nFilterIndex = 1;
     ofn.lpstrFileTitle = nullptr;
     ofn.nMaxFileTitle = 0;
     ofn.lpstrInitialDir = nullptr;
     ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_OVERWRITEPROMPT | OFN_HIDEREADONLY;
-    snprintf(filePath, sizeof(filePath), "newMat.mat");
-    if(GetSaveFileNameA(&ofn)){
+    snprintf(filePath, sizeof(filePath), "%s", defaultName);
+    if (GetSaveFileNameA(&ofn)){
         std::string fileStr(filePath);
-        if(fileStr.find(".mat") == std::string::npos)
-            fileStr += ".mat";
+        if (fileStr.find(extension) == std::string::npos)
+            fileStr += extension;
         _chdir(currentDir);
         return _strdup(fileStr.c_str());
     }
@@ -141,174 +96,169 @@ char* SaveMatFileDialog(){
         return nullptr;
     }
 }
-char* SaveZipFileDialog(){
-    static char filePath[256];
-    char currentDir[256];
-    _getcwd(currentDir, sizeof(currentDir));
-    OPENFILENAMEA ofn;
-    ZeroMemory(&ofn, sizeof(ofn));
-    ofn.lStructSize = sizeof(ofn);
-    ofn.hwndOwner = nullptr;
-    ofn.lpstrFile = filePath;
-    ofn.lpstrFile[0] = '\0';
-    ofn.nMaxFile = sizeof(filePath);
-    ofn.lpstrFilter = "Zip Files (*.zip)\0*.zip\0All Files (*.*)\0*.*\0";
-    ofn.nFilterIndex = 1;
-    ofn.lpstrFileTitle = nullptr;
-    ofn.nMaxFileTitle = 0;
-    ofn.lpstrInitialDir = nullptr;
-    ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_OVERWRITEPROMPT | OFN_HIDEREADONLY;
-    snprintf(filePath, sizeof(filePath), "textures.zip");
-    if(GetSaveFileNameA(&ofn)){
-        std::string fileStr(filePath);
-        if(fileStr.find(".zip") == std::string::npos)
-            fileStr += ".zip";
-        _chdir(currentDir);
-        return _strdup(fileStr.c_str());
-    }
-    else {
-        _chdir(currentDir);
-        return nullptr;
-    }
-}
-char* OpenFileDialogMaterial(){
-    static char filePath[256];
-    char currentDir[256];
-    _getcwd(currentDir, sizeof(currentDir));
-    OPENFILENAMEA ofn;
-    ZeroMemory(&ofn, sizeof(ofn));
-    ofn.lStructSize = sizeof(ofn);
-    ofn.hwndOwner = nullptr;
-    ofn.lpstrFile = filePath;
-    ofn.lpstrFile[0] = '\0';
-    ofn.nMaxFile = sizeof(filePath);
-    ofn.lpstrFilter = "Material Files (*.mat)\0*.mat\0All Files (*.*)\0*.*\0";
-    ofn.nFilterIndex = 1;
-    ofn.lpstrFileTitle = NULL;
-    ofn.nMaxFileTitle = 0;
-    ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST;
-    if(GetOpenFileNameA(&ofn)) {
-        _chdir(currentDir);
-        return filePath;
-    }
-    else {
-        _chdir(currentDir);
-        return nullptr;
-    }
-}
+char* SaveMatFileDialog(){ return SaveFileDialogImpl("Material Files (*.mat)\0*.mat\0All Files (*.*)\0*.*\0", "newMat.mat", ".mat"); }
+char* SaveZipFileDialog(){ return SaveFileDialogImpl("Zip Files (*.zip)\0*.zip\0All Files (*.*)\0*.*\0", "textures.zip", ".zip"); }
+char* OpenFileDialogMaterial(){ return OpenFileDialogImpl("Material Files (*.mat)\0*.mat\0All Files (*.*)\0*.*\0"); }
 #else
 #include <QFileDialog>
 #include <QString>
 #include <QApplication>
-char* OpenFileDialog(){
-    static char filePath[256];
-    int argc = 0;
-    char* argv[] = {nullptr};
-    QApplication app(argc, argv);
+static QApplication* getQApp(){
+    static int argc = 0;
+    static char* argv[] = {nullptr};
+    // Force XCB platform
+    qputenv("QT_QPA_PLATFORM", "xcb");
+    static QApplication app(argc, argv);
     QApplication::setApplicationName("Material Viewer");
-    QString filename = QFileDialog::getOpenFileName(nullptr, "Open File", "", "HDR Files (*.hdr);;All Image Files (*.hdr *.png *.jpg *.jpeg *.bmp)");
-    if(!filename.isEmpty()){
+    return &app;
+}
+char* OpenFileDialogImpl(const char* title, const char* filter){
+    static char filePath[256];
+    getQApp();
+    QString filename = QFileDialog::getOpenFileName(nullptr, title, "", filter);
+    if (!filename.isEmpty()){
         snprintf(filePath, sizeof(filePath), "%s", filename.toStdString().c_str());
         return filePath;
     }
     else return nullptr;
 }
-char* OpenFileDialogTex(){
+char* SaveFileDialogImpl(const char* title, const char* defaultName, const char* filter, const char* extension){
     static char filePath[256];
-    int argc = 0;
-    char* argv[] = {nullptr};
-    QApplication app(argc, argv);
-    QApplication::setApplicationName("Material Viewer");
-    QString filename = QFileDialog::getOpenFileName(nullptr, "Open File", "", "All Image Files (*.png *.jpg *.jpeg *.bmp)");
-    if(!filename.isEmpty()){
-        snprintf(filePath, sizeof(filePath), "%s", filename.toStdString().c_str());
-        return filePath;
-    }
-    else return nullptr;
-}
-char* OpenFileDialogZip(){
-    static char filePath[256];
-    int argc = 0;
-    char* argv[] = {nullptr};
-    QApplication app(argc, argv);
-    QApplication::setApplicationName("Material Viewer");
-    QString filename = QFileDialog::getOpenFileName(nullptr, "Open Zip File", "", "Zip Files (*.zip);;All Files (*.*)");
-    if(!filename.isEmpty()){
-        snprintf(filePath, sizeof(filePath), "%s", filename.toStdString().c_str());
-        return filePath;
-    }
-    else return nullptr;
-}
-char* SaveMatFileDialog(){
-    static char filePath[256];
-    int argc = 0;
-    char* argv[] = {nullptr};
-    QApplication app(argc, argv);
-    QApplication::setApplicationName("Material Viewer");
-    QString defaultFileName = "newMat.mat";
-    QString filename = QFileDialog::getSaveFileName(nullptr, "Save Material File", defaultFileName, "Material Files (*.mat);;All Files (*.*)");
-    if(!filename.isEmpty()){
+    getQApp();
+    QString filename = QFileDialog::getSaveFileName(nullptr, title, defaultName, filter);
+    if (!filename.isEmpty()){
         std::string fileStr = filename.toStdString();
-        if(fileStr.find(".mat") == std::string::npos)
-            fileStr += ".mat";
-        snprintf(filePath, sizeof(filePath), "%s", filename.toStdString().c_str());
+        if (fileStr.find(extension) == std::string::npos)
+            fileStr += extension;
+        snprintf(filePath, sizeof(filePath), "%s", fileStr.c_str());
         return filePath;
     }
     else return nullptr;
 }
-char* SaveZipFileDialog(){
-    static char filePath[256];
-    int argc = 0;
-    char* argv[] = {nullptr};
-    QApplication app(argc, argv);
-    QApplication::setApplicationName("Material Viewer");
-    QString defaultFileName = "textures.zip";
-    QString filename = QFileDialog::getSaveFileName(nullptr, "Save Zip File", defaultFileName, "Zip Files (*.zip);;All Files (*.*)");
-    if(!filename.isEmpty()){
-        std::string fileStr = filename.toStdString();
-        if(fileStr.find(".zip") == std::string::npos)
-            fileStr += ".zip";
-        snprintf(filePath, sizeof(filePath), "%s", filename.toStdString().c_str());
-        return filePath;
-    }
-    else return nullptr;
-}
-char* OpenFileDialogMaterial(){
-    static char filePath[256];
-    int argc = 0;
-    char* argv[] = {nullptr};
-    QApplication app(argc, argv);
-    QApplication::setApplicationName("Material Viewer");
-    QString filename = QFileDialog::getOpenFileName(nullptr, "Open Material File", "", "Material Files (*.mat);;All Files (*.*)");
-    if(!filename.isEmpty()){
-        snprintf(filePath, sizeof(filePath), "%s", filename.toStdString().c_str());
-        return filePath;
-    }
-    else return nullptr;
-}
+char* OpenFileDialog(){ return OpenFileDialogImpl("Open File", "HDR Files (*.hdr);;All Image Files (*.hdr *.png *.jpg *.jpeg *.bmp)"); }
+char* OpenFileDialogTex(){ return OpenFileDialogImpl("Open File", "All Image Files (*.png *.jpg *.jpeg *.bmp)"); }
+char* OpenFileDialogZip(){ return OpenFileDialogImpl("Open Zip File", "Zip Files (*.zip);;All Files (*.*)"); }
+char* OpenFileDialogMaterial(){ return OpenFileDialogImpl("Open Material File", "Material Files (*.mat);;All Files (*.*)"); }
+char* SaveMatFileDialog(){ return SaveFileDialogImpl("Save Material File", "newMat.mat", "Material Files (*.mat);;All Files (*.*)", ".mat"); }
+char* SaveZipFileDialog(){ return SaveFileDialogImpl("Save Zip File", "textures.zip", "Zip Files (*.zip);;All Files (*.*)", ".zip"); }
 #endif
-unsigned int SCR_WIDTH=800;
-unsigned int SCR_HEIGHT=600;
-float contentScale = 1.0f;
-
-inline float ui(float value) { return value * contentScale; }
-
 const float pi = 3.14159265359;
-float radius = 5.0f;
-float yaw = pi/8;
-float pitch = pi/12;
-glm::vec3 camPos = glm::vec3(sin(yaw)*radius, sin(pitch)*radius, cos(yaw)*radius);
-float lastX = SCR_WIDTH / 2.0;
-float lastY = SCR_HEIGHT / 2.0;
-float fov = 45.0f;
-float deltaTime = 0.0f;
-float lastFrame = 0.0f;
-bool firstMouse = true;
-bool pressMouse = false;
-std::string error = "";
-bool isMetallic = true;
-float errorTime = 0.0f;
-std::string tooltip = "";
+
+enum UIElement {
+    UI_ENV_1 = 0, UI_ENV_2, UI_ENV_3, UI_ENV_4,
+    UI_SHAPE_CUBE, UI_SHAPE_SPHERE,
+    UI_UPLOAD_HDRI, UI_OPEN_MATERIAL_PANEL,
+    UI_CLOSE_MATERIAL_PANEL, UI_TEX_ALBEDO,
+    UI_TEX_METALLIC, UI_TEX_NORMAL,
+    UI_TEX_ROUGHNESS, UI_TEX_AO,
+    UI_UPLOAD_ZIP, UI_SAVE_MAT,
+    UI_UPLOAD_MAT, UI_SHAPE_TEAPOT,
+    UI_DOWNLOAD_TEXTURES, UI_WORKFLOW_METALLIC,
+    UI_WORKFLOW_SPECULAR, UI_ELEMENT_COUNT
+};
+
+struct Camera {
+    float radius = 5.0f;
+    float yaw = pi / 8.0f;
+    float pitch = pi / 12.0f;
+    float fov = 45.0f;
+    glm::vec3 pos = glm::vec3(sin(pi / 8.0f) * 5.0f, sin(pi / 12.0f) * 5.0f, cos(pi / 8.0f) * 5.0f);
+
+    void updatePos() {
+        pos = glm::vec3(sin(yaw) * radius, sin(pitch) * radius, cos(yaw) * radius);
+    }
+};
+
+struct MaterialTextures {
+    unsigned int albedo = 0;
+    unsigned int metallic = 0;
+    unsigned int normal = 0;
+    unsigned int roughness = 0;
+    unsigned int ao = 0;
+};
+
+struct AppState {
+    unsigned int scrWidth = 800;
+    unsigned int scrHeight = 600;
+    float contentScale = 1.0f;
+    float deltaTime = 0.0f;
+    float lastFrame = 0.0f;
+    bool isMetallic = true;
+
+    float lastX, lastY;
+    bool firstMouse = true;
+
+    std::string error;
+    float errorTime = 0.0f;
+    std::string tooltip;
+
+    bool highlightingUI = false;
+    bool selectingEnv = false;
+    bool selectingShape = false;
+    bool uploadingEnv = false;
+    bool showMaterialUI = false;
+    int currentElement = 0;
+    int shapeNum = 0;
+    char* uploadedEnv = nullptr;
+
+    glm::vec3 extraColors[UI_ELEMENT_COUNT];
+
+    inline float ui(float value) const { return value * contentScale; }
+
+    void setError(const std::string& msg) {
+        std::cerr << msg << std::endl;
+        error = msg;
+        errorTime = 0.0f;
+    }
+};
+
+Camera cam;
+AppState app;
+MaterialTextures mat;
+
+struct ScreenRect {
+    float x, y, w, h;
+    bool contains(float mx, float my) const {
+        return mx >= x && mx < x + w && my >= y && my < y + h;
+    }
+};
+
+ScreenRect boundsFromModel(const glm::mat4& model, float u0 = 0, float v0 = 0, float u1 = 1, float v1 = 1) {
+    glm::vec4 corners[4] = {
+        model * glm::vec4(u0, v0, 0, 1),
+        model * glm::vec4(u1, v0, 0, 1),
+        model * glm::vec4(u0, v1, 0, 1),
+        model * glm::vec4(u1, v1, 0, 1),
+    };
+    float minX = corners[0].x, maxX = corners[0].x;
+    float minY = corners[0].y, maxY = corners[0].y;
+    for (int i = 1; i < 4; ++i) {
+        minX = std::min(minX, corners[i].x);
+        maxX = std::max(maxX, corners[i].x);
+        minY = std::min(minY, corners[i].y);
+        maxY = std::max(maxY, corners[i].y);
+    }
+    return {minX, minY, maxX - minX, maxY - minY};
+}
+
+struct UIButton {
+    UIElement id;
+    std::string tooltip;
+    float x, y, w, h;
+    unsigned int texture = 0;
+    bool visible = true;
+    bool flipY = false;
+
+    bool contains(float mx, float my) const {
+        return visible && mx >= x && mx < x + w && my >= y && my < y + h;
+    }
+};
+
+std::vector<UIButton> buttons;
+std::vector<UIButton> materialButtons;
+ScreenRect materialPanelBounds;
+glm::mat4 materialPanelModel(1.0f);
+
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void mouseCallback(GLFWwindow* window, double xpos, double ypos);
 void processInput(GLFWwindow *window);
@@ -333,31 +283,19 @@ std::string toResourcePath(const std::string& path) {
     return result;
 }
 
-char* getShaders(std::string file){
+std::string getShaders(std::string file){
     std::string resourcePath = toResourcePath(file);
     const auto* resource = EmbeddedResources::getResource(resourcePath);
     if (resource) {
-        char* shader = (char*)malloc(*resource->size + 1);
-        memcpy(shader, resource->data, *resource->size);
-        shader[*resource->size] = '\0';
-        return shader;
+        return std::string(reinterpret_cast<const char*>(resource->data), *resource->size);
     }
-    FILE* shaderFile = fopen(file.c_str(), "r");
-    if(!shaderFile) {
+    std::ifstream shaderFile(file);
+    if (!shaderFile.is_open()) {
         std::cerr<<"Error opening shader file at "<<file<<"\n";
-        error = "Error opening shader file.";
-        errorTime = 0.0f;
-        return nullptr;
+        app.setError("Error opening shader file.");
+        return "";
     }
-    int fileSize = 0;
-    fseek(shaderFile, 0, SEEK_END);
-    fileSize = ftell(shaderFile);
-    rewind(shaderFile);
-    char* shader = (char*)malloc(sizeof(char) * (fileSize+1));
-    fread(shader, sizeof(char), fileSize, shaderFile);
-    shader[fileSize] = '\0';
-    fclose(shaderFile);
-    return shader;
+    return std::string((std::istreambuf_iterator<char>(shaderFile)), std::istreambuf_iterator<char>());
 }
 unsigned int loadEnv(std::string file){
     stbi_set_flip_vertically_on_load(true);
@@ -372,7 +310,7 @@ unsigned int loadEnv(std::string file){
     }
     
     unsigned int hdrTexture;
-    if(data){
+    if (data){
         glGenTextures(1, &hdrTexture);
         glBindTexture(GL_TEXTURE_2D, hdrTexture);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, width, height, 0, GL_RGB, GL_FLOAT, data);
@@ -384,17 +322,34 @@ unsigned int loadEnv(std::string file){
     }
     else{
         std::cerr<<"HDR image failed to load at path "<<file<<std::endl;
-        error = "HDR image failed to load.";
-        errorTime = 0.0f;
+        app.setError("HDR image failed to load.");
     }
     return hdrTexture;
 }
-unsigned int loadTexture(std::string file){
+static GLenum channelsToFormat(int nrComponents) {
+    if (nrComponents == 1) return GL_RED;
+    if (nrComponents == 4) return GL_RGBA;
+    return GL_RGB;
+}
+
+static unsigned int uploadTextureToGL(unsigned char* data, int width, int height, int channels) {
     unsigned int textureID;
     glGenTextures(1, &textureID);
+    GLenum format = channelsToFormat(channels);
+    glBindTexture(GL_TEXTURE_2D, textureID);
+    glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
+    glGenerateMipmap(GL_TEXTURE_2D);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    return textureID;
+}
+
+unsigned int loadTexture(std::string file){
     int width, height, nrComponents;
     unsigned char* data = nullptr;
-    
+
     std::string resourcePath = toResourcePath(file);
     const auto* resource = EmbeddedResources::getResource(resourcePath);
     if (resource) {
@@ -402,51 +357,26 @@ unsigned int loadTexture(std::string file){
     } else {
         data = stbi_load(file.c_str(), &width, &height, &nrComponents, 0);
     }
-    
-    if(data){
-        GLenum format = GL_RGB;
-        if(nrComponents == 1) format = GL_RED;
-        else if(nrComponents == 3) format = GL_RGB;
-        else if(nrComponents == 4) format = GL_RGBA;
-        glBindTexture(GL_TEXTURE_2D, textureID);
-        glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
-        glGenerateMipmap(GL_TEXTURE_2D);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    }
-    else{
+
+    if (!data){
         std::cerr<<"Texture image failed to load at path "<<file<<std::endl;
-        error = "Texture image failed to load.";
-        errorTime = 0.0f;
+        app.setError("Texture image failed to load.");
+        return 0;
     }
+    unsigned int textureID = uploadTextureToGL(data, width, height, nrComponents);
     stbi_image_free(data);
     return textureID;
 }
 struct ImageData{
-    unsigned char* data;
+    unsigned char* data = nullptr;
     int width;
     int height;
     int channels;
     size_t dataSize;
+    ~ImageData() { delete[] data; }
 };
 unsigned int loadTexture(ImageData* imageData){
-    unsigned int textureID;
-    glGenTextures(1, &textureID);
-    GLenum format = GL_RGB;
-    int nrComponents = imageData->channels;
-    if(nrComponents == 1) format = GL_RED;
-    else if(nrComponents == 3) format = GL_RGB;
-    else if(nrComponents == 4) format = GL_RGBA;
-    glBindTexture(GL_TEXTURE_2D, textureID);
-    glTexImage2D(GL_TEXTURE_2D, 0, format, imageData->width, imageData->height, 0, format, GL_UNSIGNED_BYTE, imageData->data);
-    glGenerateMipmap(GL_TEXTURE_2D);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    return textureID;
+    return uploadTextureToGL(imageData->data, imageData->width, imageData->height, imageData->channels);
 }
 std::string replaceSlashes(const std::string& path) {
     std::regex slashRegex("/");
@@ -503,6 +433,40 @@ std::string getAppPath(const char* relativePath){
 #endif
     return pathBuffer;
 }
+namespace fs = std::filesystem;
+std::vector<std::string> listFilesInDir(const std::string& dirPath, const std::string& extension) {
+    std::vector<std::string> files;
+    if (!fs::exists(dirPath) || !fs::is_directory(dirPath)) {
+        return files;
+    }
+    for (const auto& entry : fs::directory_iterator(dirPath)) {
+        if (entry.is_regular_file()) {
+            std::string path = entry.path().string();
+            if (extension.empty() || (path.size() >= extension.size() &&
+                path.compare(path.size() - extension.size(), extension.size(), extension) == 0)) {
+                files.push_back(path);
+            }
+        }
+    }
+    std::sort(files.begin(), files.end());
+    return files;
+}
+std::vector<std::string> listSubdirsWithFile(const std::string& dirPath, const std::string& filename) {
+    std::vector<std::string> results;
+    if (!fs::exists(dirPath) || !fs::is_directory(dirPath)) {
+        return results;
+    }
+    for (const auto& entry : fs::directory_iterator(dirPath)) {
+        if (entry.is_directory()) {
+            fs::path filePath = entry.path() / filename;
+            if (fs::exists(filePath)) {
+                results.push_back(filePath.string());
+            }
+        }
+    }
+    std::sort(results.begin(), results.end());
+    return results;
+}
 std::string normalizeString(const std::string &str) {
     std::string normalized;
     for (char c : str) {
@@ -515,30 +479,30 @@ std::string normalizeString(const std::string &str) {
     while (iss >> token) {
         if (irrelevant.count(token) == 0) result += token + " ";
     }
-    if(!result.empty()) result.pop_back();
+    if (!result.empty()) result.pop_back();
     return result;
 }
 std::vector<std::string> generateNgrams(const std::string &str, int n){
     std::vector<std::string> ngrams;
-    if(str.size()<n) {
+    if (str.size()<n) {
         ngrams.push_back(str);
         return ngrams;
     }
-    for(size_t i=0; i<=str.size()-n; i++){
+    for (size_t i = 0; i <= str.size() - n; ++i){
         ngrams.push_back(str.substr(i,n));
     }
     return ngrams;
 }
 double computeCosineSimilarity(const std::vector<std::string> &vec1, const std::vector<std::string> &vec2){
     std::unordered_map<std::string, int> freq1, freq2;
-    for(const auto &gram : vec1) freq1[gram]++;
-    for(const auto &gram : vec2) freq2[gram]++;
+    for (const auto &gram : vec1) freq1[gram]++;
+    for (const auto &gram : vec2) freq2[gram]++;
     double dot = 0.0, mag1 = 0.0, mag2 = 0.0;
-    for(const auto &[gram, count1] : freq1){
-        if(freq2.count(gram)) dot += count1 * freq2[gram];
+    for (const auto &[gram, count1] : freq1){
+        if (freq2.count(gram)) dot += count1 * freq2[gram];
         mag1 += count1 * count1;
     }
-    for(const auto &[gram, count2] : freq2){
+    for (const auto &[gram, count2] : freq2){
         mag2 += count2 * count2;
     }
     if (mag1 == 0 || mag2 == 0) return 0.0;
@@ -549,10 +513,10 @@ double computeMatchScore(const std::string &filename, const std::string &keyword
     std::string normalizedKeyword = normalizeString(keyword);
     std::istringstream iss(normalizedFilename);
     std::string word;
-    while(iss >> word){
-        if(word == normalizedKeyword) return 1.0;
+    while (iss >> word){
+        if (word == normalizedKeyword) return 1.0;
     }
-    if(normalizedKeyword.length() >= 3 && normalizedFilename.find(normalizedKeyword) != std::string::npos){
+    if (normalizedKeyword.length() >= 3 && normalizedFilename.find(normalizedKeyword) != std::string::npos){
         return 0.9;
     }
     auto filenameNgrams = generateNgrams(normalizedFilename, 3);
@@ -562,9 +526,9 @@ double computeMatchScore(const std::string &filename, const std::string &keyword
 void matchTextures(const std::vector<std::string> &filenames, const std::unordered_map<std::string, int> &textureMap, zip* archive, int numTextures, std::vector<int> &textures){
     int numFiles = filenames.size();
     std::vector<std::vector<double>> probabilities(numFiles, std::vector<double>(numTextures, 0.0));
-    for (int i = 0; i < numFiles; i++) {
+    for (int i = 0; i < numFiles; ++i) {
         std::string format = filenames[i].substr(filenames[i].size()-3, 3);
-        if(format != "png" && format != "jpg" && format != "peg" && format != "gif" && format != "ebp" && format != "bmp" && format != "eif") continue;
+        if (format != "png" && format != "jpg" && format != "peg" && format != "gif" && format != "ebp" && format != "bmp" && format != "eif") continue;
         for (const auto &[keyword, slot] : textureMap) {
             probabilities[i][slot] = std::max(probabilities[i][slot], computeMatchScore(filenames[i], keyword));
         }
@@ -577,9 +541,9 @@ void matchTextures(const std::vector<std::string> &filenames, const std::unorder
         int bestFile = -1;
         int bestSlot = -1;
 
-        for (int i = 0; i < numFiles; i++) {
+        for (int i = 0; i < numFiles; ++i) {
             if (assignedFiles[i]) continue;
-            for (int j = 0; j < numTextures; j++) {
+            for (int j = 0; j < numTextures; ++j) {
                 if (assignedSlots[j]) continue;
                 if (probabilities[i][j] > maxProbability) {
                     maxProbability = probabilities[i][j];
@@ -590,7 +554,7 @@ void matchTextures(const std::vector<std::string> &filenames, const std::unorder
         }
         if (bestFile == -1 || bestSlot == -1 || maxProbability < 0.1) break; 
         zip_file* zfile = zip_fopen(archive, filenames[bestFile].c_str(), ZIP_FL_UNCHANGED);
-        if(!zfile){
+        if (!zfile){
             std::cerr << "Failed to open file in zip: " << filenames[bestFile] << std::endl;
             assignedFiles[bestFile] = true;
             continue;
@@ -620,32 +584,30 @@ void matchTextures(const std::vector<std::string> &filenames, const std::unorder
         remove(tempFilename.c_str());
         assignedFiles[bestFile] = true;
         assignedSlots[bestSlot] = true;
-        for (int i = 0; i < numFiles; i++) {
+        for (int i = 0; i < numFiles; ++i) {
             if (assignedFiles[i]) continue;
             double sum = 0.0;
-            for (int j = 0; j < numTextures; j++) {
+            for (int j = 0; j < numTextures; ++j) {
                 if (assignedSlots[j]) continue;
                 sum += probabilities[i][j];
             }
             if (sum > 0) {
-                for (int j = 0; j < numTextures; j++) {
+                for (int j = 0; j < numTextures; ++j) {
                     if (!assignedSlots[j]) probabilities[i][j] /= sum;
                 }
             }
         }
     }
 }
-std::pair<unsigned int*, bool> OpenZipFile(const char* path){
+std::pair<std::array<unsigned int, 5>, bool> OpenZipFile(const char* path){
     const int numTextures = 5;
-    unsigned int* textures = new unsigned int[numTextures];
-    for(int i=0; i<numTextures; i++) textures[i] = -1;
+    std::array<unsigned int, 5> textures;
+    textures.fill(static_cast<unsigned int>(-1));
     int err = 0;
     zip* archive = zip_open(path, 0, &err);
     bool metallic = true;
-    if(!archive) {
-        std::cerr<<"Failed to open archive."<<std::endl;
-        error = "Failed to open archive";
-        errorTime = 0.0f;
+    if (!archive) {
+        app.setError("Failed to open archive");
         return {textures, metallic};
     }
     else{
@@ -660,12 +622,10 @@ std::pair<unsigned int*, bool> OpenZipFile(const char* path){
         };
         zip_int64_t numFiles = zip_get_num_entries(archive, 0);
         std::vector<std::string> filenames;
-        for(zip_int64_t i=0; i<numFiles; i++){
+        for (zip_int64_t i = 0; i < numFiles; ++i){
             const char* filename = zip_get_name(archive, i, 0);
-            if(!filename){
-                std::cerr<<"Error opening file in zip"<<std::endl;
-                error = "Error opening file in zip";
-                errorTime = 0.0f;
+            if (!filename){
+                app.setError("Error opening file in zip");
                 continue;
             }
             filenames.emplace_back(filename);
@@ -676,7 +636,7 @@ std::pair<unsigned int*, bool> OpenZipFile(const char* path){
         textures[0] = matchedTextures[0];
         textures[2] = matchedTextures[2];
         textures[4] = matchedTextures[4];
-        if(matchedTextures[5]!=-1&&matchedTextures[6]!=-1){
+        if (matchedTextures[5]!=-1&&matchedTextures[6]!=-1){
             textures[1] = matchedTextures[5];
             textures[3] = matchedTextures[6];
             metallic = false;
@@ -698,37 +658,59 @@ unsigned int createShader(std::string &vertSource, std::string &fragSource){
     int success;
     char infoLog[512];
     glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &success);
-    if(!success){
+    if (!success){
         glGetShaderInfoLog(vertexShader, 512, nullptr, infoLog);
         std::cerr<<"A vertex shader compilation failed.\n"<<infoLog<<std::endl;
-        error = "A vertex shader compilation failed.";
-        errorTime = 0.0f;
+        app.setError("A vertex shader compilation failed.");
     }
     unsigned int fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
     const char* fragShaderCStr = fragSource.c_str();
     glShaderSource(fragmentShader, 1, &fragShaderCStr, nullptr);
     glCompileShader(fragmentShader);
     glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &success);
-    if(!success){
+    if (!success){
         glGetShaderInfoLog(fragmentShader, 512, nullptr, infoLog);
         std::cerr<<"A fragment shader compilation failed.\n"<<infoLog<<std::endl;
-        error = "A fragment shader compilation failed.";
-        errorTime = 0.0f;
+        app.setError("A fragment shader compilation failed.");
     }
     unsigned int shaderProgram = glCreateProgram();
     glAttachShader(shaderProgram, vertexShader);
     glAttachShader(shaderProgram, fragmentShader);
     glLinkProgram(shaderProgram);
     glGetProgramiv(shaderProgram, GL_LINK_STATUS, &success);
-    if(!success){
+    if (!success){
         glGetProgramInfoLog(shaderProgram, 512, nullptr, infoLog);
         std::cerr << "Linking shader program failed. \n"<<infoLog<<std::endl;
-        error = "Linking shader program failed.";
-        errorTime = 0.0f;
+        app.setError("Linking shader program failed.");
     }
     glDeleteShader(vertexShader);
     glDeleteShader(fragmentShader);
     return shaderProgram;
+}
+unsigned int createCubemap(int size, GLenum minFilter, bool genMipmaps = false) {
+    unsigned int cubemap;
+    glGenTextures(1, &cubemap);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, cubemap);
+    for (unsigned int i = 0; i < 6; ++i){
+        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB32F, size, size, 0, GL_RGB, GL_FLOAT, nullptr);
+    }
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, minFilter);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    if (genMipmaps) glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
+    return cubemap;
+}
+void renderCubemapFaces(unsigned int program, unsigned int cubemap, unsigned int VAO, const glm::mat4* views, int mipLevel = 0) {
+    for (unsigned int i = 0; i < 6; ++i){
+        glUniformMatrix4fv(glGetUniformLocation(program, "view"), 1, GL_FALSE, &views[i][0][0]);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, cubemap, mipLevel);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glBindVertexArray(VAO);
+        glDrawArrays(GL_TRIANGLES, 0, 36);
+        glBindVertexArray(0);
+    }
 }
 void HDRItoCubemap(std::string environmentLoc, unsigned int skyProgram, unsigned int irradianceProgram, unsigned int prefilterProgram, unsigned int VAO, unsigned int &envCubemapSet, unsigned int &irradianceMapSet, unsigned int &prefilterMapSet){
     unsigned int captureFBO;
@@ -740,17 +722,7 @@ void HDRItoCubemap(std::string environmentLoc, unsigned int skyProgram, unsigned
     glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, 512, 512);
     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, captureRBO);
     unsigned int hdrTexture = loadEnv(environmentLoc);
-    unsigned int envCubemap;
-    glGenTextures(1, &envCubemap);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, envCubemap);
-    for(unsigned int i=0; i<6; i++){
-        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB32F, 512, 512, 0, GL_RGB, GL_FLOAT, nullptr);
-    }
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    unsigned int envCubemap = createCubemap(512, GL_LINEAR_MIPMAP_LINEAR);
     glm::mat4 captureProj = glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 10.0f);
     glm::mat4 captureViews[] = {
         glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(1.0f, 0.0f, 0.0f), glm::vec3(0.0f, -1.0f, 0.0f)),
@@ -766,27 +738,10 @@ void HDRItoCubemap(std::string environmentLoc, unsigned int skyProgram, unsigned
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, hdrTexture);
     glViewport(0, 0, 512, 512);
-    for(unsigned int i=0; i<6; i++){
-        glUniformMatrix4fv(glGetUniformLocation(skyProgram, "view"), 1, GL_FALSE, &captureViews[i][0][0]);
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, envCubemap, 0);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        glBindVertexArray(VAO);
-        glDrawArrays(GL_TRIANGLES, 0, 36);
-        glBindVertexArray(0);
-    }
+    renderCubemapFaces(skyProgram, envCubemap, VAO, captureViews);
     glBindTexture(GL_TEXTURE_CUBE_MAP, envCubemap);
     glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
-    unsigned int irradianceMap;
-    glGenTextures(1, &irradianceMap);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, irradianceMap);
-    for(unsigned int i=0; i<6; i++){
-        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB32F, 32, 32, 0, GL_RGB, GL_FLOAT, nullptr);
-    }
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    unsigned int irradianceMap = createCubemap(32, GL_LINEAR);
     glBindRenderbuffer(GL_RENDERBUFFER, captureRBO);
     glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, 32, 32);
     glUseProgram(irradianceProgram);
@@ -795,33 +750,15 @@ void HDRItoCubemap(std::string environmentLoc, unsigned int skyProgram, unsigned
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_CUBE_MAP, envCubemap);
     glViewport(0, 0, 32, 32);
-    for(unsigned int i=0; i<6; i++){
-        glUniformMatrix4fv(glGetUniformLocation(irradianceProgram, "view"), 1, GL_FALSE, &captureViews[i][0][0]);
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, irradianceMap, 0);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        glBindVertexArray(VAO);
-        glDrawArrays(GL_TRIANGLES, 0, 36);
-        glBindVertexArray(0);
-    }
-    unsigned int prefilterMap;
-    glGenTextures(1, &prefilterMap);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, prefilterMap);
-    for(unsigned int i=0; i<6; i++){
-        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB32F, 128, 128, 0, GL_RGB, GL_FLOAT, nullptr);
-    }
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
+    renderCubemapFaces(irradianceProgram, irradianceMap, VAO, captureViews);
+    unsigned int prefilterMap = createCubemap(128, GL_LINEAR_MIPMAP_LINEAR, true);
     glUseProgram(prefilterProgram);
     glUniform1i(glGetUniformLocation(prefilterProgram, "skybox"), 0); 
     glUniformMatrix4fv(glGetUniformLocation(prefilterProgram, "projection"), 1, GL_FALSE, &captureProj[0][0]);
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_CUBE_MAP, envCubemap);
     unsigned int maxMipLevels = 5;
-    for(unsigned int mip = 0; mip<maxMipLevels; mip++){
+    for (unsigned int mip = 0; mip < maxMipLevels; ++mip){
         unsigned int mipWidth = static_cast<unsigned int>(128 * std::pow(0.5, mip));
         unsigned int mipHeight = static_cast<unsigned int>(128 * std::pow(0.5, mip));
         glBindRenderbuffer(GL_RENDERBUFFER, captureRBO);
@@ -829,17 +766,10 @@ void HDRItoCubemap(std::string environmentLoc, unsigned int skyProgram, unsigned
         glViewport(0, 0, mipWidth, mipHeight);
         float roughness = (float)mip / (float)(maxMipLevels - 1);
         glUniform1f(glGetUniformLocation(prefilterProgram, "roughness"), roughness); 
-        for(unsigned int i=0; i<6; i++){
-            glUniformMatrix4fv(glGetUniformLocation(prefilterProgram, "view"), 1, GL_FALSE, &captureViews[i][0][0]);
-            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, prefilterMap, mip);
-            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-            glBindVertexArray(VAO);
-            glDrawArrays(GL_TRIANGLES, 0, 36);
-            glBindVertexArray(0);
-        }
+        renderCubemapFaces(prefilterProgram, prefilterMap, VAO, captureViews, mip);
     }
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
+    glViewport(0, 0, app.scrWidth, app.scrHeight);
     envCubemapSet = envCubemap;
     irradianceMapSet = irradianceMap;
     prefilterMapSet = prefilterMap;
@@ -891,7 +821,7 @@ void GetBRDFLUTTexture(unsigned int brdfProgram, unsigned int &brdfMapSet){
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
     glBindVertexArray(0);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
+    glViewport(0, 0, app.scrWidth, app.scrHeight);
     brdfMapSet = brdfLUTTexture;
     return;
 }
@@ -931,8 +861,7 @@ ImageData* loadTextureData(unsigned int textureID){
             break;
         default:
             std::cerr<<"Unsupported texture format: "<<internalFormat<<std::endl;
-            error = "Unsupported texture format.";
-            errorTime = 0.0f;
+            app.setError("Unsupported texture format.");
             delete imgData;
             return nullptr;
     }
@@ -945,21 +874,17 @@ std::mutex zipMutex;
 void saveTexturesToZip(const char* path, unsigned int albedo, unsigned int roughness, unsigned int normal, unsigned int metallic, unsigned int ao){
     int errorTemp;
     zip_t* zip = zip_open(path, ZIP_CREATE | ZIP_TRUNCATE, &errorTemp);
-    if(!zip){
-        std::cerr<<"Couldn't save zip file"<<std::endl;
-        error = "Couldn't save zip file";
-        errorTime = 0.0f;
+    if (!zip){
+        app.setError("Couldn't save zip file");
         return;
     }
-    ImageData* albedoData = loadTextureData(albedo);
-    ImageData* roughnessData = loadTextureData(roughness);
-    ImageData* normalData = loadTextureData(normal);
-    ImageData* metalnessData = loadTextureData(metallic);
-    ImageData* aoData = loadTextureData(ao);
+    std::unique_ptr<ImageData> albedoData(loadTextureData(albedo));
+    std::unique_ptr<ImageData> roughnessData(loadTextureData(roughness));
+    std::unique_ptr<ImageData> normalData(loadTextureData(normal));
+    std::unique_ptr<ImageData> metalnessData(loadTextureData(metallic));
+    std::unique_ptr<ImageData> aoData(loadTextureData(ao));
     if (!albedoData || !roughnessData || !normalData || !metalnessData || !aoData) {
-        std::cerr << "Failed to load one or more texture data." << std::endl;
-        error = "Failed to load one or more texture data.";
-        errorTime = 0.0f;
+        app.setError("Failed to load one or more texture data.");
         zip_discard(zip);
         return;
     }
@@ -968,34 +893,30 @@ void saveTexturesToZip(const char* path, unsigned int albedo, unsigned int rough
         int pngSize;
         unsigned char* pngData = stbi_write_png_to_mem(texture->data, texture->width * texture->channels, texture->width, texture->height, texture->channels, &pngSize);
         if (!pngData) {
-            std::cerr<<"Couldn't save png to memory"<<std::endl;
-            error = "Couldn't save png to memory";
-            errorTime = 0.0f;
+            app.setError("Couldn't save png to memory");
             return;
         }
         std::lock_guard<std::mutex> lock(zipMutex);
         dataBuffer.emplace_back(filename, std::vector<unsigned char>(pngData, pngData + pngSize));
         stbi_image_free(pngData);
     };
-    std::thread t1(processTexture, albedoData, "albedo.png");
-    std::thread t2(processTexture, roughnessData, "roughness.png");
-    std::thread t3(processTexture, normalData, "normal.png");
-    std::thread t4(processTexture, metalnessData, "metallic.png");
-    std::thread t5(processTexture, aoData, "ao.png");
+    std::thread t1(processTexture, albedoData.get(), "albedo.png");
+    std::thread t2(processTexture, roughnessData.get(), "roughness.png");
+    std::thread t3(processTexture, normalData.get(), "normal.png");
+    std::thread t4(processTexture, metalnessData.get(), "metallic.png");
+    std::thread t5(processTexture, aoData.get(), "ao.png");
     t1.join();
     t2.join();
     t3.join();
     t4.join();
     t5.join();
-    for(const auto& [filename, pngData] : dataBuffer) {
+    for (const auto& [filename, pngData] : dataBuffer) {
         int pngSize = sizeof(pngData);
         zip_source_t* source = zip_source_buffer(zip, pngData.data(), pngData.size(), 0);
         if (!source || zip_file_add(zip, filename.c_str(), source, ZIP_FL_OVERWRITE) < 0) {
             zip_source_free(source);
             zip_discard(zip);
-            std::cerr << "Couldn't add PNG to zip file"<<std::endl;
-            error = "Couldn't add PNG to zip file";
-            errorTime = 0.0f;
+            app.setError("Couldn't add PNG to zip file");
             return;
         }
     }
@@ -1003,15 +924,13 @@ void saveTexturesToZip(const char* path, unsigned int albedo, unsigned int rough
     return;
 }
 void writeCustomTextureFile(const char* outputPath, unsigned int albedo, unsigned int roughness, unsigned int normal, unsigned int metalness, unsigned int ao){
-    ImageData* albedoData = loadTextureData(albedo);
-    ImageData* roughnessData = loadTextureData(roughness);
-    ImageData* normalData = loadTextureData(normal);
-    ImageData* metalnessData = loadTextureData(metalness);
-    ImageData* aoData = loadTextureData(ao);
+    std::unique_ptr<ImageData> albedoData(loadTextureData(albedo));
+    std::unique_ptr<ImageData> roughnessData(loadTextureData(roughness));
+    std::unique_ptr<ImageData> normalData(loadTextureData(normal));
+    std::unique_ptr<ImageData> metalnessData(loadTextureData(metalness));
+    std::unique_ptr<ImageData> aoData(loadTextureData(ao));
     if (!albedoData || !roughnessData || !normalData || !metalnessData || !aoData) {
-        std::cerr << "Failed to load one or more texture data." << std::endl;
-        error = "Failed to load one or more texture data.";
-        errorTime = 0.0f;
+        app.setError("Failed to load one or more texture data.");
         return;
     }
     TextureMetadata albedoMeta = { albedoData->width, albedoData->height, albedoData->channels, static_cast<unsigned int>(albedoData->width * albedoData->height * albedoData->channels) };
@@ -1022,12 +941,11 @@ void writeCustomTextureFile(const char* outputPath, unsigned int albedo, unsigne
     std::ofstream outputFile(outputPath, std::ios::binary);
     if (!outputFile.is_open()) {
         std::cerr << "Failed to open output file " << outputPath << std::endl;
-        error = "Failed to open output file.";
-        errorTime = 0.0f;
+        app.setError("Failed to open output file.");
         return;
     }
     long long int magicNumber;
-    if(isMetallic) magicNumber = 0x4D4154455249414C;
+    if (app.isMetallic) magicNumber = 0x4D4154455249414C;
     else magicNumber = 0x53504543554C4152;
     outputFile.write(reinterpret_cast<const char*>(&magicNumber), sizeof(magicNumber));
     outputFile.write(reinterpret_cast<const char*>(&albedoMeta), sizeof(albedoMeta));
@@ -1040,30 +958,19 @@ void writeCustomTextureFile(const char* outputPath, unsigned int albedo, unsigne
         size_t compressedBound = ZSTD_compressBound(originalSize);
         std::vector<unsigned char> compressedData(compressedBound);
         size_t compressedSize = ZSTD_compress(compressedData.data(), compressedBound, imageData->data, originalSize, 1);
-        if(ZSTD_isError(compressedSize)){
+        if (ZSTD_isError(compressedSize)){
             std::cerr<<"Compression error: "<<ZSTD_getErrorName(compressedSize)<<std::endl;
-            error = "Error compressing textures";
-            errorTime = 0.0f;
+            app.setError("Error compressing textures");
             return;
         }
         outputFile.write(reinterpret_cast<const char*>(&compressedSize), sizeof(compressedSize));
         outputFile.write(reinterpret_cast<const char*>(compressedData.data()), compressedSize);
     };
-    compressWriteTexture(albedoData);
-    compressWriteTexture(roughnessData);
-    compressWriteTexture(normalData);
-    compressWriteTexture(metalnessData);
-    compressWriteTexture(aoData);
-    delete[] albedoData->data;
-    delete albedoData;
-    delete[] roughnessData->data;
-    delete roughnessData;
-    delete[] normalData->data;
-    delete normalData;
-    delete[] metalnessData->data;
-    delete metalnessData;
-    delete[] aoData->data;
-    delete aoData;
+    compressWriteTexture(albedoData.get());
+    compressWriteTexture(roughnessData.get());
+    compressWriteTexture(normalData.get());
+    compressWriteTexture(metalnessData.get());
+    compressWriteTexture(aoData.get());
     outputFile.close();
     std::cout << "Material file written to " << outputPath << std::endl;
     return;
@@ -1095,10 +1002,8 @@ void readCustomTextureFile(std::string inputPath, unsigned int &albedo, unsigned
         inputStream = std::make_unique<std::istream>(memBuf.get());
     } else {
         inputFile.open(inputPath, std::ios::binary);
-        if(!inputFile.is_open()){
-            std::cerr << "Failed to load material file" << std::endl;
-            error = "Failed to load material file.";
-            errorTime = 0.0f;
+        if (!inputFile.is_open()){
+            app.setError("Failed to load material file.");
             return;
         }
         inputStream = std::make_unique<std::istream>(inputFile.rdbuf());
@@ -1108,12 +1013,10 @@ void readCustomTextureFile(std::string inputPath, unsigned int &albedo, unsigned
     
     long long int magicNumber;
     input.read(reinterpret_cast<char*>(&magicNumber), sizeof(magicNumber));
-    if(magicNumber == 0x4D4154455249414C) isMetallic = true;
-    else if(magicNumber == 0x53504543554C4152) isMetallic = false;
+    if (magicNumber == 0x4D4154455249414C) app.isMetallic = true;
+    else if (magicNumber == 0x53504543554C4152) app.isMetallic = false;
     else{
-        std::cerr << "Invalid file format" << std::endl;
-        error = "Invalid file format.";
-        errorTime = 0.0f;
+        app.setError("Invalid file format.");
         return;
     }
     TextureMetadata albedoMeta, roughnessMeta, normalMeta, metalnessMeta, aoMeta;
@@ -1136,34 +1039,28 @@ void readCustomTextureFile(std::string inputPath, unsigned int &albedo, unsigned
         size_t actualDecompressedSize = ZSTD_decompress(imageData->data, decompressedSize, compressedData.data(), compressedSize);
         if (ZSTD_isError(actualDecompressedSize)) {
             std::cerr << "Decompression error: " << ZSTD_getErrorName(actualDecompressedSize) << std::endl;
-            error = "Error decompressing textures";
-            errorTime = 0.0f;
+            app.setError("Error decompressing textures");
             delete[] imageData->data;
             delete imageData;
             return nullptr;
         }
         return imageData;
     };
-    ImageData* albedoData = loadTextureFromStream(albedoMeta);
-    ImageData* roughnessData = loadTextureFromStream(roughnessMeta);
-    ImageData* normalData = loadTextureFromStream(normalMeta);
-    ImageData* metalnessData = loadTextureFromStream(metalnessMeta);
-    ImageData* aoData = loadTextureFromStream(aoMeta);
-    albedoID = loadTexture(albedoData);
-    roughnessID = loadTexture(roughnessData);
-    normalID = loadTexture(normalData);
-    metallicID = loadTexture(metalnessData);
-    aoID = loadTexture(aoData);
-    delete[] albedoData->data;
-    delete albedoData;
-    delete[] roughnessData->data;
-    delete roughnessData;
-    delete[] normalData->data;
-    delete normalData;
-    delete[] metalnessData->data;
-    delete metalnessData;
-    delete[] aoData->data;
-    delete aoData;
+    std::unique_ptr<ImageData> albedoData(loadTextureFromStream(albedoMeta));
+    if (!albedoData) return;
+    std::unique_ptr<ImageData> roughnessData(loadTextureFromStream(roughnessMeta));
+    if (!roughnessData) return;
+    std::unique_ptr<ImageData> normalData(loadTextureFromStream(normalMeta));
+    if (!normalData) return;
+    std::unique_ptr<ImageData> metalnessData(loadTextureFromStream(metalnessMeta));
+    if (!metalnessData) return;
+    std::unique_ptr<ImageData> aoData(loadTextureFromStream(aoMeta));
+    if (!aoData) return;
+    albedoID = loadTexture(albedoData.get());
+    roughnessID = loadTexture(roughnessData.get());
+    normalID = loadTexture(normalData.get());
+    metallicID = loadTexture(metalnessData.get());
+    aoID = loadTexture(aoData.get());
     if (inputFile.is_open()) inputFile.close();
     albedo = albedoID;
     roughness = roughnessID;
@@ -1181,10 +1078,8 @@ struct Character{
 std::map<char, Character> Characters;
 void prepareCharacters(){
     FT_Library ft;
-    if(FT_Init_FreeType(&ft)) {
-        std::cerr<<"Could not initialize FreeType"<<std::endl;
-        error = "Could not initialize FreeType.";
-        errorTime = 0.0f;
+    if (FT_Init_FreeType(&ft)) {
+        app.setError("Could not initialize FreeType.");
         FT_Done_FreeType(ft);
         return;
     }
@@ -1197,18 +1092,16 @@ void prepareCharacters(){
         ftError = FT_New_Face(ft, getAppPath("/resources/Roboto-Regular.ttf").c_str(), 0, &face);
     }
     
-    if(ftError){
-        std::cerr<<"Could not load font"<<std::endl;
-        error = "Could not load font.";
-        errorTime = 0.0f;
+    if (ftError){
+        app.setError("Could not load font.");
         FT_Done_Face(face);
         FT_Done_FreeType(ft);
         return;
     }
     FT_Set_Pixel_Sizes(face, 0, 48);
     glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-    for(unsigned char c = 0; c < 128; c++){
-        if(FT_Load_Char(face, c, FT_LOAD_RENDER)){
+    for (unsigned char c = 0; c < 128; ++c){
+        if (FT_Load_Char(face, c, FT_LOAD_RENDER)){
             std::cerr<<"Failed to load gylph: "<<c<<std::endl;
             continue;
         }
@@ -1229,7 +1122,7 @@ void prepareCharacters(){
 }
 void RenderText(unsigned int shader, unsigned int VAO, unsigned int VBO, std::string text, float x, float y, float scale, glm::vec3 color){
     glUseProgram(shader);
-    glm::mat4 textProj = glm::ortho(0.0f, (float)SCR_WIDTH, 0.0f, (float)SCR_HEIGHT);
+    glm::mat4 textProj = glm::ortho(0.0f, (float)app.scrWidth, 0.0f, (float)app.scrHeight);
     glUniformMatrix4fv(glGetUniformLocation(shader, "projection"), 1, GL_FALSE, &textProj[0][0]);
     glUniform3f(glGetUniformLocation(shader, "textColor"), color.x, color.y, color.z);
     glm::mat4 spriteModel = glm::mat4(1.0f);
@@ -1237,7 +1130,7 @@ void RenderText(unsigned int shader, unsigned int VAO, unsigned int VBO, std::st
     glActiveTexture(GL_TEXTURE0);
     glBindVertexArray(VAO);
     std::string::const_iterator c;
-    for(c = text.begin(); c != text.end(); c++){
+    for (c = text.begin(); c != text.end(); ++c){
         Character ch = Characters[*c];
         float xPos = x + ch.bearing.x * scale;
         float yPos = y - (ch.size.y - ch.bearing.y) * scale;
@@ -1287,16 +1180,14 @@ void loadModel(std::string filePath, unsigned int &VAO, unsigned int &VBO, unsig
         loaded = loader.LoadFile(filePath.c_str());
     }
     
-    if(!loaded){
-        std::cerr<<"Failed to load OBJ file"<<std::endl;
-        error = "Failed to load OBJ file";
-        errorTime = 0.0f;
+    if (!loaded){
+        app.setError("Failed to load OBJ file");
         return;
     }
     objl::Mesh mesh = loader.LoadedMeshes[0];
     glm::vec3 minBound(FLT_MAX, FLT_MAX, FLT_MAX);
     glm::vec3 maxBound(-FLT_MAX, -FLT_MAX, -FLT_MAX);
-    for(int i=0; i<mesh.Vertices.size(); i++){
+    for (size_t i = 0; i < mesh.Vertices.size(); ++i){
         const auto& vertex = mesh.Vertices[i];
         minBound = glm::min(minBound, glm::vec3(vertex.Position.X, vertex.Position.Y, vertex.Position.Z));
         maxBound = glm::max(maxBound, glm::vec3(vertex.Position.X, vertex.Position.Y, vertex.Position.Z));
@@ -1311,11 +1202,11 @@ void loadModel(std::string filePath, unsigned int &VAO, unsigned int &VBO, unsig
     glm::vec3 size = maxBound - minBound;
     float aspectRatio = size.x / size.y;
     float scaleFactor;
-    if(aspectRatio > 1.0f) scaleFactor = 1.8f / maxDistance;
+    if (aspectRatio > 1.0f) scaleFactor = 1.8f / maxDistance;
     else scaleFactor = 1.25f / (maxDistance);
     std::vector<float> vertices;
     std::vector<unsigned int> indices = mesh.Indices;
-    for(int i=0; i<mesh.Vertices.size(); i++){
+    for (size_t i = 0; i < mesh.Vertices.size(); ++i){
         glm::vec3 scaledPosition(
             (mesh.Vertices[i].Position.X - center.x) * scaleFactor,
             (mesh.Vertices[i].Position.Y - center.y) * scaleFactor,
@@ -1348,85 +1239,85 @@ void loadModel(std::string filePath, unsigned int &VAO, unsigned int &VBO, unsig
     return;
 }
 
-std::string vertexLoc = getAppPath("/shaders/main.vert");
-std::string fragmentLoc = getAppPath("/shaders/main.frag");
-std::string skyFragmentLoc = getAppPath("/shaders/sky.frag");
-std::string cubemapVertexLoc = getAppPath("/shaders/cubemap.vert");
-std::string cubemapFragmentLoc = getAppPath("/shaders/cubemap.frag");
-std::string irradianceFragmentLoc = getAppPath("/shaders/irradiance.frag");
-std::string prefilterFragmentLoc = getAppPath("/shaders/prefilter.frag");
-std::string brdfFragmentLoc = getAppPath("/shaders/brdf.frag");
-std::string brdfVertexLoc = getAppPath("/shaders/brdf.vert");
-std::string uiVertexLoc = getAppPath("/shaders/ui.vert");
-std::string uiFragmentLoc = getAppPath("/shaders/ui.frag");
-std::string textFragmentLoc = getAppPath("/shaders/text.frag");
-std::string vertexShaderSource = getShaders(vertexLoc);
-std::string fragmentShaderSource = getShaders(fragmentLoc);
-std::string skyFragmentShaderSource = getShaders(skyFragmentLoc);
-std::string cubemapVertexShaderSource = getShaders(cubemapVertexLoc);
-std::string cubemapFragmentShaderSource = getShaders(cubemapFragmentLoc);
-std::string irradianceFragmentShaderSource = getShaders(irradianceFragmentLoc);
-std::string prefilterFragmentShaderSource = getShaders(prefilterFragmentLoc);
-std::string brdfFragmentShaderSource = getShaders(brdfFragmentLoc);
-std::string brdfVertexShaderSource = getShaders(brdfVertexLoc);
-std::string uiVertexShaderSource = getShaders(uiVertexLoc);
-std::string uiFragmentShaderSource = getShaders(uiFragmentLoc);
-std::string textFragmentShaderSource = getShaders(textFragmentLoc);
+std::unordered_map<std::string, std::string> shaders;
+void loadShaders() {
+    for (const auto& path : listFilesInDir(getAppPath("/shaders"), "")) {
+        std::string name = fs::path(path).filename().string();
+        shaders[name] = getShaders(path);
+    }
+}
 std::string defaultMatLoc = getAppPath("/material/stainless_steel.mat");
 std::string albedoLoc = getAppPath("/material/albedoNot.png");
 std::string aoLoc = getAppPath("/material/aoNot.png");
 std::string metallicLoc = getAppPath("/material/metallicNot.png");
 std::string normalLoc = getAppPath("/material/normalNot.png");
 std::string roughnessLoc = getAppPath("/material/roughnessNot.png");
-std::string environmentLocs[] = {
-    getAppPath("/environments/industrial_sunset_puresky/environment.hdr"),
-    getAppPath("/environments/kloppenheim_02_puresky/environment.hdr"),
-    getAppPath("/environments/snowy_forest/environment.hdr"),
-    getAppPath("/environments/syferfontein_1d_clear_puresky/environment.hdr")
-};
-int currentElement = 0;
-std::string uiElementLocs[] = {
-    getAppPath("/ui/hdri_ui1.png"),
-    getAppPath("/ui/hdri_ui2.png"),
-    getAppPath("/ui/hdri_ui3.png"),
-    getAppPath("/ui/hdri_ui4.png"),
-    getAppPath("/ui/hdri_ui5.png"),
-    getAppPath("/ui/hdri_ui6.png"),
-    getAppPath("/ui/hdri_ui7.png"),
-    getAppPath("/ui/hdri_ui8.png"),
-    getAppPath("/ui/hdri_ui9.png"),
-    getAppPath("/ui/img_ui10.png"),
-    getAppPath("/ui/img_ui11.png"),
-    getAppPath("/ui/img_ui12.png"),
-    getAppPath("/ui/img_ui13.png"),
-    getAppPath("/ui/img_ui14.png"),
-    getAppPath("/ui/img_ui15.png"),
-    getAppPath("/ui/img_ui16.png"),
-    getAppPath("/ui/img_ui17.png"),
-    getAppPath("/ui/img_ui18.png"),
-    getAppPath("/ui/img_ui19.png"),
-    getAppPath("/ui/img_ui20.png"),
-    getAppPath("/ui/img_ui21.png"),
-};
-constexpr size_t UI_ELEMENT_COUNT = 21;
-glm::vec3 extraColors[UI_ELEMENT_COUNT];
+std::vector<std::string> environmentLocs = listSubdirsWithFile(getAppPath("/environments"), "environment.hdr");
+std::vector<std::string> uiElementLocs = listFilesInDir(getAppPath("/ui"), ".png");
 std::string cubeLoc = getAppPath("/models/cube.obj");
 std::string sphereLoc = getAppPath("/models/sphere.obj");
 std::string teapotLoc = getAppPath("/models/teapot.obj");
 std::string backgroundLoc = getAppPath("/resources/background.png");
-bool highlightingUI = false;
-bool selectingEnv = false;
-bool selectingShape = false;
-bool uploadingEnv = false;
-char* uploadedEnv = nullptr;
-bool showMaterialUI = false;
-unsigned int albedo;
-unsigned int metallic;
-unsigned int normal;
-unsigned int roughness;
-unsigned int ao;
+void drawSprite(unsigned int program, const glm::mat4& model, const glm::vec3& color, unsigned int texture) {
+    glUniformMatrix4fv(glGetUniformLocation(program, "model"), 1, GL_FALSE, &model[0][0]);
+    glUniform3fv(glGetUniformLocation(program, "extraColor"), 1, &color[0]);
+    glBindTexture(GL_TEXTURE_2D, texture);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+}
 
-int main(int argc, char* argv[]) {   
+void layoutButtons(const unsigned int* uiElements) {
+    float sw = (float)app.scrWidth;
+    float sh = (float)app.scrHeight;
+
+    buttons = {
+        {UI_ENV_1, "", app.ui(10.0f), sh - app.ui(60.0f), app.ui(50.0f), app.ui(50.0f), uiElements[UI_ENV_1], true, true},
+        {UI_ENV_2, "", app.ui(60.0f), sh - app.ui(60.0f), app.ui(50.0f), app.ui(50.0f), uiElements[UI_ENV_2], true, true},
+        {UI_ENV_3, "", app.ui(110.0f), sh - app.ui(60.0f), app.ui(50.0f), app.ui(50.0f), uiElements[UI_ENV_3], true, true},
+        {UI_ENV_4, "", app.ui(160.0f), sh - app.ui(60.0f), app.ui(50.0f), app.ui(50.0f), uiElements[UI_ENV_4], true, true},
+        {UI_UPLOAD_HDRI, "Upload HDRI environment", app.ui(210.0f), sh - app.ui(60.0f), app.ui(50.0f), app.ui(50.0f), uiElements[UI_UPLOAD_HDRI], true, true},
+        {UI_SHAPE_CUBE, "", sw - app.ui(60.0f), sh - app.ui(60.0f), app.ui(50.0f), app.ui(50.0f), uiElements[UI_SHAPE_CUBE], true, true},
+        {UI_SHAPE_SPHERE, "", sw - app.ui(110.0f), sh - app.ui(60.0f), app.ui(50.0f), app.ui(50.0f), uiElements[UI_SHAPE_SPHERE], true, true},
+        {UI_SHAPE_TEAPOT, "", sw - app.ui(160.0f), sh - app.ui(60.0f), app.ui(50.0f), app.ui(50.0f), uiElements[UI_SHAPE_TEAPOT], true, true},
+        {UI_OPEN_MATERIAL_PANEL, "Change material", sw - app.ui(210.0f), sh - app.ui(60.0f), app.ui(50.0f), app.ui(50.0f), uiElements[UI_OPEN_MATERIAL_PANEL], true, true},
+    };
+
+    materialButtons.clear();
+    if (app.showMaterialUI) {
+        materialPanelModel = glm::mat4(1.0f);
+        materialPanelModel = glm::translate(materialPanelModel, glm::vec3(sw * 0.085f, sh * 0.95f, 0.0f));
+        materialPanelModel = glm::scale(materialPanelModel, glm::vec3(sw / 1.2f, -sh / 1.2f, 1.0f));
+        materialPanelBounds = boundsFromModel(materialPanelModel,
+            244.0f / 1280.0f, 112.0f / 720.0f, 1039.0f / 1280.0f, 618.0f / 720.0f
+        );
+
+        float pl = materialPanelBounds.x;
+        float pt = materialPanelBounds.y;
+        float pw = materialPanelBounds.w;
+        float ph = materialPanelBounds.h;
+        float pr = pl + pw;
+        float pb = pt + ph;
+        float pcx = pl + pw / 2.0f;
+
+        materialButtons = {
+            {UI_CLOSE_MATERIAL_PANEL, "", pr - app.ui(30.0f), pt + app.ui(40.0f), app.ui(20.0f), app.ui(20.0f), uiElements[UI_CLOSE_MATERIAL_PANEL], true, false},
+            {UI_TEX_ALBEDO, "", pl + app.ui(20.0f), pt + app.ui(40.0f), app.ui(50.0f), app.ui(50.0f), mat.albedo, true, false},
+            {UI_TEX_METALLIC, "", pl + app.ui(20.0f), pt + app.ui(100.0f), app.ui(50.0f), app.ui(50.0f), mat.metallic, true, false},
+            {UI_TEX_NORMAL, "", pl + app.ui(20.0f), pt + app.ui(160.0f), app.ui(50.0f), app.ui(50.0f), mat.normal, true, false},
+            {UI_TEX_ROUGHNESS, "", pl + app.ui(20.0f), pt + app.ui(220.0f), app.ui(50.0f), app.ui(50.0f), mat.roughness, true, false},
+            {UI_TEX_AO, "", pl + app.ui(20.0f), pt + app.ui(280.0f), app.ui(50.0f), app.ui(50.0f), mat.ao, true, false},
+            {UI_UPLOAD_ZIP, "Upload .zip", pr - app.ui(60.0f), pt + app.ui(65.0f), app.ui(50.0f), app.ui(50.0f), uiElements[UI_UPLOAD_ZIP], true, true},
+            {UI_SAVE_MAT, "Save .mat", pr - app.ui(60.0f), pt + app.ui(120.0f), app.ui(50.0f), app.ui(50.0f), uiElements[UI_SAVE_MAT], true, true},
+            {UI_UPLOAD_MAT, "Upload .mat", pr - app.ui(60.0f), pt + app.ui(175.0f), app.ui(50.0f), app.ui(50.0f), uiElements[UI_UPLOAD_MAT], true, true},
+            {UI_DOWNLOAD_TEXTURES, "Download textures", pr - app.ui(60.0f), pt + app.ui(230.0f), app.ui(50.0f), app.ui(50.0f), uiElements[UI_DOWNLOAD_TEXTURES], true, true},
+            {UI_WORKFLOW_METALLIC, "Use metallic workflow", pcx - app.ui(50.0f), pb - app.ui(55.0f), app.ui(100.0f), app.ui(40.0f),
+                app.isMetallic ? uiElements[UI_WORKFLOW_SPECULAR] : uiElements[UI_WORKFLOW_METALLIC], true, true},
+            {UI_WORKFLOW_SPECULAR, "Use specular workflow", pcx + app.ui(50.0f), pb - app.ui(55.0f), app.ui(100.0f), app.ui(40.0f),
+                !app.isMetallic ? uiElements[UI_WORKFLOW_SPECULAR] : uiElements[UI_WORKFLOW_METALLIC], true, true},
+        };
+    }
+}
+
+int main(int argc, char* argv[]) {
     if (!glfwInit()) {
         std::cerr << "Failed to initialize GLFW" << std::endl;
         return -1;
@@ -1441,22 +1332,23 @@ int main(int argc, char* argv[]) {
 #endif
 
     GLFWwindow* window;
-    window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "Material Viewer", nullptr, nullptr);
+    window = glfwCreateWindow(app.scrWidth, app.scrHeight, "Material Viewer", nullptr, nullptr);
     if (window == nullptr) {
         std::cerr << "Failed to open GLFW window" << std::endl;
         glfwTerminate();
         return -1;
     }
     glfwMakeContextCurrent(window);
+    glfwSwapInterval(1);
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
     glfwSetCursorPosCallback(window, mouseCallback);
     int fbWidth, fbHeight;
     glfwGetFramebufferSize(window, &fbWidth, &fbHeight);
-    SCR_WIDTH = fbWidth;
-    SCR_HEIGHT = fbHeight;
+    app.scrWidth = fbWidth;
+    app.scrHeight = fbHeight;
     int winWidth, winHeight;
     glfwGetWindowSize(window, &winWidth, &winHeight);
-    contentScale = (float)fbWidth / (float)winWidth; // for Retina or high-DPI displays
+    app.contentScale = (float)fbWidth / (float)winWidth; // for Retina or high-DPI displays
 
     if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
         std::cerr << "Failed to initialize GLAD" << std::endl;
@@ -1474,7 +1366,8 @@ int main(int argc, char* argv[]) {
     unsigned int teapotVAO, teapotVBO, teapotEBO, teapotIndexCount;
     loadModel(teapotLoc, teapotVAO, teapotVBO, teapotEBO, teapotIndexCount);
     
-    unsigned int shaderProgram = createShader(vertexShaderSource, fragmentShaderSource);
+    loadShaders();
+    unsigned int shaderProgram = createShader(shaders["main.vert"], shaders["main.frag"]);
 
     float skyVertices[] = {       
         -1.0f,  1.0f, -1.0f,
@@ -1529,31 +1422,31 @@ int main(int argc, char* argv[]) {
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
     
-    unsigned int skyShaderProgram = createShader(cubemapVertexShaderSource, skyFragmentShaderSource);
-    unsigned int cubemapShaderProgram = createShader(cubemapVertexShaderSource, cubemapFragmentShaderSource);
-    unsigned int irradianceShaderProgram = createShader(cubemapVertexShaderSource, irradianceFragmentShaderSource);
-    unsigned int prefilterShaderProgram = createShader(cubemapVertexShaderSource, prefilterFragmentShaderSource);
-    unsigned int brdfShaderProgram = createShader(brdfVertexShaderSource, brdfFragmentShaderSource);
+    unsigned int skyShaderProgram = createShader(shaders["cubemap.vert"], shaders["sky.frag"]);
+    unsigned int cubemapShaderProgram = createShader(shaders["cubemap.vert"], shaders["cubemap.frag"]);
+    unsigned int irradianceShaderProgram = createShader(shaders["cubemap.vert"], shaders["irradiance.frag"]);
+    unsigned int prefilterShaderProgram = createShader(shaders["cubemap.vert"], shaders["prefilter.frag"]);
+    unsigned int brdfShaderProgram = createShader(shaders["brdf.vert"], shaders["brdf.frag"]);
 
     unsigned int envCubemap;
     unsigned int irradianceMap;
     unsigned int prefilterMap;
     unsigned int brdfMap;
-    HDRItoCubemap(environmentLocs[currentElement], cubemapShaderProgram, irradianceShaderProgram, prefilterShaderProgram, skyVAO, envCubemap, irradianceMap, prefilterMap);
+    HDRItoCubemap(environmentLocs[app.currentElement], cubemapShaderProgram, irradianceShaderProgram, prefilterShaderProgram, skyVAO, envCubemap, irradianceMap, prefilterMap);
     GetBRDFLUTTexture(brdfShaderProgram, brdfMap);
 
-    readCustomTextureFile(defaultMatLoc, albedo, roughness, normal, metallic, ao);
+    readCustomTextureFile(defaultMatLoc, mat.albedo, mat.roughness, mat.normal, mat.metallic, mat.ao);
     if (argc > 1) {
         std::cout << "Opening file: " << argv[1] << std::endl;
-        readCustomTextureFile(argv[1], albedo, roughness, normal, metallic, ao);
+        readCustomTextureFile(argv[1], mat.albedo, mat.roughness, mat.normal, mat.metallic, mat.ao);
     } 
     else std::cout << "No file provided." << std::endl;
 
-    for(unsigned int i=0; i<UI_ELEMENT_COUNT; i++){
-        extraColors[i] = glm::vec3(1.0f);
+    for (unsigned int i = 0; i < UI_ELEMENT_COUNT; ++i){
+        app.extraColors[i] = glm::vec3(1.0f);
     }
     unsigned int uiElements[UI_ELEMENT_COUNT] = {};
-    for(unsigned int i=0; i<UI_ELEMENT_COUNT; i++){
+    for (unsigned int i = 0; i < UI_ELEMENT_COUNT; ++i){
         uiElements[i] = loadTexture(uiElementLocs[i]);
     }
     unsigned int uiBackground = loadTexture(backgroundLoc);
@@ -1577,8 +1470,8 @@ int main(int argc, char* argv[]) {
     glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
-    unsigned int spriteProgram = createShader(uiVertexShaderSource, uiFragmentShaderSource);
-    unsigned int textProgram = createShader(uiVertexShaderSource, textFragmentShaderSource);
+    unsigned int spriteProgram = createShader(shaders["ui.vert"], shaders["ui.frag"]);
+    unsigned int textProgram = createShader(shaders["ui.vert"], shaders["text.frag"]);
     unsigned int textVAO, textVBO;
     glGenVertexArrays(1, &textVAO);
     glGenBuffers(1, &textVBO);
@@ -1591,29 +1484,28 @@ int main(int argc, char* argv[]) {
     glBindVertexArray(0);
     prepareCharacters();
 
-    int shapeNum = 0;
     float tooltipTime = 0.0f;
 
-    while(!glfwWindowShouldClose(window)) {
+    while (!glfwWindowShouldClose(window)) {
         float currentFrame = static_cast<float>(glfwGetTime());
-        deltaTime = currentFrame - lastFrame;
-        lastFrame = currentFrame;
+        app.deltaTime = currentFrame - app.lastFrame;
+        app.lastFrame = currentFrame;
         processInput(window);
 
-        if(selectingEnv){
-            selectingEnv = false;
-            HDRItoCubemap(environmentLocs[currentElement], cubemapShaderProgram, irradianceShaderProgram, prefilterShaderProgram, skyVAO, envCubemap, irradianceMap, prefilterMap);
-            uploadedEnv = nullptr;
+        if (app.selectingEnv){
+            app.selectingEnv = false;
+            HDRItoCubemap(environmentLocs[app.currentElement], cubemapShaderProgram, irradianceShaderProgram, prefilterShaderProgram, skyVAO, envCubemap, irradianceMap, prefilterMap);
+            app.uploadedEnv = nullptr;
         }
-        else if(selectingShape){
-            selectingShape = false;
-            if(currentElement == 4) shapeNum = 1;
-            else if(currentElement == 5) shapeNum = 0;
-            else if(currentElement == 17) shapeNum = 2;
+        else if (app.selectingShape){
+            app.selectingShape = false;
+            if (app.currentElement == UI_SHAPE_CUBE) app.shapeNum = 1;
+            else if (app.currentElement == UI_SHAPE_SPHERE) app.shapeNum = 0;
+            else if (app.currentElement == UI_SHAPE_TEAPOT) app.shapeNum = 2;
         }
-        else if(uploadingEnv){
-            uploadingEnv = false;
-            HDRItoCubemap(uploadedEnv, cubemapShaderProgram, irradianceShaderProgram, prefilterShaderProgram, skyVAO, envCubemap, irradianceMap, prefilterMap);
+        else if (app.uploadingEnv){
+            app.uploadingEnv = false;
+            HDRItoCubemap(app.uploadedEnv, cubemapShaderProgram, irradianceShaderProgram, prefilterShaderProgram, skyVAO, envCubemap, irradianceMap, prefilterMap);
         }
         
         glClearColor(0.1f, 0.1f, 0.2f, 1.0f);
@@ -1622,19 +1514,19 @@ int main(int argc, char* argv[]) {
 
         glUseProgram(shaderProgram);
 
-        glm::mat4 projection = glm::perspective(glm::radians(fov), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
+        glm::mat4 projection = glm::perspective(glm::radians(cam.fov), (float)app.scrWidth / (float)app.scrHeight, 0.1f, 100.0f);
         glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "projection"), 1, GL_FALSE, &projection[0][0]);
 
-        glm::mat4 view = glm::lookAt(camPos, glm::vec3(0.0,0.0,0.0), glm::vec3(0.0,1.0,0.0));
+        glm::mat4 view = glm::lookAt(cam.pos, glm::vec3(0.0,0.0,0.0), glm::vec3(0.0,1.0,0.0));
         glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "view"), 1, GL_FALSE, &view[0][0]);
 
-        glUniform3fv(glGetUniformLocation(shaderProgram, "camPos"), 1, &camPos[0]);
+        glUniform3fv(glGetUniformLocation(shaderProgram, "camPos"), 1, &cam.pos[0]);
 
-        if(shapeNum == 1)
+        if (app.shapeNum == 1)
             glBindVertexArray(cubeVAO);
-        else if(shapeNum == 0)
+        else if (app.shapeNum == 0)
             glBindVertexArray(sphereVAO);
-        else if(shapeNum == 2)
+        else if (app.shapeNum == 2)
             glBindVertexArray(teapotVAO);
 
         glm::mat4 model = glm::mat4(1.0f);
@@ -1654,29 +1546,29 @@ int main(int argc, char* argv[]) {
         glUniform1i(glGetUniformLocation(shaderProgram, "brdfMap"), 3);
 
         glActiveTexture(GL_TEXTURE4);
-        glBindTexture(GL_TEXTURE_2D, albedo);
+        glBindTexture(GL_TEXTURE_2D, mat.albedo);
         glUniform1i(glGetUniformLocation(shaderProgram, "albedoMap"), 4);
         glActiveTexture(GL_TEXTURE5);
-        glBindTexture(GL_TEXTURE_2D, metallic);
+        glBindTexture(GL_TEXTURE_2D, mat.metallic);
         glUniform1i(glGetUniformLocation(shaderProgram, "metallicMap"), 5);
         glActiveTexture(GL_TEXTURE6);
-        glBindTexture(GL_TEXTURE_2D, normal);
+        glBindTexture(GL_TEXTURE_2D, mat.normal);
         glUniform1i(glGetUniformLocation(shaderProgram, "normalMap"), 6);
         glActiveTexture(GL_TEXTURE7);
-        glBindTexture(GL_TEXTURE_2D, roughness);
+        glBindTexture(GL_TEXTURE_2D, mat.roughness);
         glUniform1i(glGetUniformLocation(shaderProgram, "roughnessMap"), 7);
         glActiveTexture(GL_TEXTURE8);
-        glBindTexture(GL_TEXTURE_2D, ao);
+        glBindTexture(GL_TEXTURE_2D, mat.ao);
         glUniform1i(glGetUniformLocation(shaderProgram, "aoMap"), 8);
 
-        if(isMetallic) glUniform1i(glGetUniformLocation(shaderProgram, "isMetallic"), 1);
+        if (app.isMetallic) glUniform1i(glGetUniformLocation(shaderProgram, "isMetallic"), 1);
         else glUniform1i(glGetUniformLocation(shaderProgram, "isMetallic"), 0);
 
-        if(shapeNum == 1)
+        if (app.shapeNum == 1)
             glDrawElements(GL_TRIANGLES, cubeIndexCount, GL_UNSIGNED_INT, 0);
-        else if(shapeNum == 0)
+        else if (app.shapeNum == 0)
             glDrawElements(GL_TRIANGLES, sphereIndexCount, GL_UNSIGNED_INT, 0);
-        else if(shapeNum == 2)
+        else if (app.shapeNum == 2)
             glDrawElements(GL_TRIANGLES, teapotIndexCount, GL_UNSIGNED_INT, 0);
         glBindVertexArray(0);
 
@@ -1696,188 +1588,94 @@ int main(int argc, char* argv[]) {
 
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        glDisable(GL_DEPTH_TEST);
         
-        if(error != ""){
-            RenderText(textProgram, textVAO, textVBO, error, ui(10.0f), (float)SCR_HEIGHT - ui(20.0f), 0.35f * contentScale, glm::vec3(0.8f, 0.2f, 0.2f));
-            errorTime += deltaTime;
-            if(errorTime >= 7.0f) error = "";
+        if (app.error != ""){
+            RenderText(textProgram, textVAO, textVBO, app.error, app.ui(10.0f), (float)app.scrHeight - app.ui(20.0f), 0.35f * app.contentScale, glm::vec3(0.8f, 0.2f, 0.2f));
+            app.errorTime += app.deltaTime;
+            if (app.errorTime >= 7.0f) app.error = "";
         }
-        else errorTime = 0.0f;
-        if(tooltip != ""){
-            tooltipTime += deltaTime;
-            if(tooltipTime >= 0.5f){
-                RenderText(textProgram, textVAO, textVBO, tooltip, lastX, (float)SCR_HEIGHT - lastY, 0.35f * contentScale, glm::vec3(0.8f, 0.8f, 0.8f));
-                glUseProgram(spriteProgram);
-                glm::mat4 spriteModel = glm::mat4(1.0f);
-                spriteModel = glm::translate(spriteModel, glm::vec3(lastX - ui(2.5f), (float)SCR_HEIGHT - lastY - ui(2.5f), 0.0f));
-                spriteModel = glm::scale(spriteModel, glm::vec3(ui(8.5f) * tooltip.size(), ui(20.0f), 1.0f));
-                glm::mat4 textProj = glm::ortho(0.0f, (float)SCR_WIDTH, 0.0f, (float)SCR_HEIGHT);
-                glUniformMatrix4fv(glGetUniformLocation(spriteProgram, "model"), 1, GL_FALSE, &spriteModel[0][0]);
-                glUniformMatrix4fv(glGetUniformLocation(spriteProgram, "projection"), 1, GL_FALSE, &textProj[0][0]);
-                glUniform3fv(glGetUniformLocation(spriteProgram, "extraColor"), 1, &glm::vec3(0.5f, 0.5f, 0.5f)[0]);
-                glActiveTexture(GL_TEXTURE0);
-                glBindTexture(GL_TEXTURE_2D, 0);
-                glBindVertexArray(spriteVAO);
-                glDrawArrays(GL_TRIANGLES, 0, 6);
-            }
+        else app.errorTime = 0.0f;
+        if (app.tooltip != ""){
+            tooltipTime += app.deltaTime;
         }
         else tooltipTime = 0.0f;
-        glm::mat4 orthoProj = glm::ortho(0.0f, (float)SCR_WIDTH, (float)SCR_HEIGHT, 0.0f, -1.0f, 1.0f);
-        glm::mat4 spriteModel = glm::mat4(1.0f);
+        layoutButtons(uiElements);
+        glm::mat4 orthoProj = glm::ortho(0.0f, (float)app.scrWidth, (float)app.scrHeight, 0.0f, -1.0f, 1.0f);
         glUseProgram(spriteProgram);
-        spriteModel = glm::translate(spriteModel, glm::vec3(ui(10.0f), (float)SCR_HEIGHT - ui(10.0f), 0.0f));
-        spriteModel = glm::scale(spriteModel, glm::vec3(ui(50.0f), ui(-50.0f), 1.0f));
-        glUniformMatrix4fv(glGetUniformLocation(spriteProgram, "model"), 1, GL_FALSE, &spriteModel[0][0]);
         glUniformMatrix4fv(glGetUniformLocation(spriteProgram, "projection"), 1, GL_FALSE, &orthoProj[0][0]);
-        glUniform3fv(glGetUniformLocation(spriteProgram, "extraColor"), 1, &extraColors[0][0]);
         glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, uiElements[0]);
         glBindVertexArray(spriteVAO);
-        glDrawArrays(GL_TRIANGLES, 0, 6);
-        spriteModel = glm::translate(spriteModel, glm::vec3(1.0f, 0.0f, 0.0f));
-        glUniformMatrix4fv(glGetUniformLocation(spriteProgram, "model"), 1, GL_FALSE, &spriteModel[0][0]);
-        glUniform3fv(glGetUniformLocation(spriteProgram, "extraColor"), 1, &extraColors[1][0]);
-        glBindTexture(GL_TEXTURE_2D, uiElements[1]);
-        glDrawArrays(GL_TRIANGLES, 0, 6);
-        spriteModel = glm::translate(spriteModel, glm::vec3(1.0f, 0.0f, 0.0f));
-        glUniformMatrix4fv(glGetUniformLocation(spriteProgram, "model"), 1, GL_FALSE, &spriteModel[0][0]);
-        glUniform3fv(glGetUniformLocation(spriteProgram, "extraColor"), 1, &extraColors[2][0]);
-        glBindTexture(GL_TEXTURE_2D, uiElements[2]);
-        glDrawArrays(GL_TRIANGLES, 0, 6);
-        spriteModel = glm::translate(spriteModel, glm::vec3(1.0f, 0.0f, 0.0f));
-        glUniformMatrix4fv(glGetUniformLocation(spriteProgram, "model"), 1, GL_FALSE, &spriteModel[0][0]);
-        glUniform3fv(glGetUniformLocation(spriteProgram, "extraColor"), 1, &extraColors[3][0]);
-        glBindTexture(GL_TEXTURE_2D, uiElements[3]);
-        glDrawArrays(GL_TRIANGLES, 0, 6);
-        spriteModel = glm::translate(spriteModel, glm::vec3(1.0f, 0.0f, 0.0f));
-        glUniformMatrix4fv(glGetUniformLocation(spriteProgram, "model"), 1, GL_FALSE, &spriteModel[0][0]);
-        glUniform3fv(glGetUniformLocation(spriteProgram, "extraColor"), 1, &extraColors[6][0]);
-        glBindTexture(GL_TEXTURE_2D, uiElements[6]);
-        glDrawArrays(GL_TRIANGLES, 0, 6);
-        spriteModel = glm::mat4(1.0f);
-        spriteModel = glm::translate(spriteModel, glm::vec3((float)SCR_WIDTH - ui(60.0f), (float)SCR_HEIGHT - ui(10.0f), 0.0f));
-        spriteModel = glm::scale(spriteModel, glm::vec3(ui(50.0f), ui(-50.0f), 1.0f));
-        glUniformMatrix4fv(glGetUniformLocation(spriteProgram, "model"), 1, GL_FALSE, &spriteModel[0][0]);
-        glUniform3fv(glGetUniformLocation(spriteProgram, "extraColor"), 1, &extraColors[4][0]);
-        glBindTexture(GL_TEXTURE_2D, uiElements[4]);
-        glDrawArrays(GL_TRIANGLES, 0, 6);
-        spriteModel = glm::translate(spriteModel, glm::vec3(-1.0f, 0.0f, 0.0f));
-        glUniformMatrix4fv(glGetUniformLocation(spriteProgram, "model"), 1, GL_FALSE, &spriteModel[0][0]);
-        glUniform3fv(glGetUniformLocation(spriteProgram, "extraColor"), 1, &extraColors[5][0]);
-        glBindTexture(GL_TEXTURE_2D, uiElements[5]);
-        glDrawArrays(GL_TRIANGLES, 0, 6);
-        spriteModel = glm::translate(spriteModel, glm::vec3(-1.0f, 0.0f, 0.0f));
-        glUniformMatrix4fv(glGetUniformLocation(spriteProgram, "model"), 1, GL_FALSE, &spriteModel[0][0]);
-        glUniform3fv(glGetUniformLocation(spriteProgram, "extraColor"), 1, &extraColors[17][0]);
-        glBindTexture(GL_TEXTURE_2D, uiElements[17]);
-        glDrawArrays(GL_TRIANGLES, 0, 6);
-        spriteModel = glm::translate(spriteModel, glm::vec3(-1.0f, 0.0f, 0.0f));
-        glUniformMatrix4fv(glGetUniformLocation(spriteProgram, "model"), 1, GL_FALSE, &spriteModel[0][0]);
-        glUniform3fv(glGetUniformLocation(spriteProgram, "extraColor"), 1, &extraColors[7][0]);
-        glBindTexture(GL_TEXTURE_2D, uiElements[7]);
-        glDrawArrays(GL_TRIANGLES, 0, 6);
+        for (const auto& btn : buttons) {
+            if (!btn.visible) continue;
+            glm::mat4 model = glm::mat4(1.0f);
+            if (btn.flipY) {
+                model = glm::translate(model, glm::vec3(btn.x, btn.y + btn.h, 0.0f));
+                model = glm::scale(model, glm::vec3(btn.w, -btn.h, 1.0f));
+            } else {
+                model = glm::translate(model, glm::vec3(btn.x, btn.y, 0.0f));
+                model = glm::scale(model, glm::vec3(btn.w, btn.h, 1.0f));
+            }
+            drawSprite(spriteProgram, model, app.extraColors[btn.id], btn.texture);
+        }
 
-        if(showMaterialUI){
-            spriteModel = glm::mat4(1.0f);
-            spriteModel = glm::translate(spriteModel, glm::vec3((float)SCR_WIDTH / 4.0f + ui(20.0f), (float)SCR_HEIGHT / 4.0f + ui(20.0f), 0.0f));
-            spriteModel = glm::scale(spriteModel, glm::vec3(ui(50.0f), ui(50.0f), 1.0f));
-            glUniformMatrix4fv(glGetUniformLocation(spriteProgram, "model"), 1, GL_FALSE, &spriteModel[0][0]);
-            glUniform3fv(glGetUniformLocation(spriteProgram, "extraColor"), 1, &extraColors[9][0]);
-            glBindTexture(GL_TEXTURE_2D, albedo);
-            glDrawArrays(GL_TRIANGLES, 0, 6);
-            spriteModel = glm::translate(spriteModel, glm::vec3(0.0f, 1.2f, 0.0f));
-            glUniformMatrix4fv(glGetUniformLocation(spriteProgram, "model"), 1, GL_FALSE, &spriteModel[0][0]);
-            glUniform3fv(glGetUniformLocation(spriteProgram, "extraColor"), 1, &extraColors[10][0]);
-            glBindTexture(GL_TEXTURE_2D, metallic);
-            glDrawArrays(GL_TRIANGLES, 0, 6);
-            spriteModel = glm::translate(spriteModel, glm::vec3(0.0f, 1.2f, 0.0f));
-            glUniformMatrix4fv(glGetUniformLocation(spriteProgram, "model"), 1, GL_FALSE, &spriteModel[0][0]);
-            glUniform3fv(glGetUniformLocation(spriteProgram, "extraColor"), 1, &extraColors[11][0]);
-            glBindTexture(GL_TEXTURE_2D, normal);
-            glDrawArrays(GL_TRIANGLES, 0, 6);
-            spriteModel = glm::translate(spriteModel, glm::vec3(0.0f, 1.2f, 0.0f));
-            glUniformMatrix4fv(glGetUniformLocation(spriteProgram, "model"), 1, GL_FALSE, &spriteModel[0][0]);
-            glUniform3fv(glGetUniformLocation(spriteProgram, "extraColor"), 1, &extraColors[12][0]);
-            glBindTexture(GL_TEXTURE_2D, roughness);
-            glDrawArrays(GL_TRIANGLES, 0, 6);
-            spriteModel = glm::translate(spriteModel, glm::vec3(0.0f, 1.2f, 0.0f));
-            glUniformMatrix4fv(glGetUniformLocation(spriteProgram, "model"), 1, GL_FALSE, &spriteModel[0][0]);
-            glUniform3fv(glGetUniformLocation(spriteProgram, "extraColor"), 1, &extraColors[13][0]);
-            glBindTexture(GL_TEXTURE_2D, ao);
-            glDrawArrays(GL_TRIANGLES, 0, 6);
-            RenderText(textProgram, textVAO, textVBO, "Base Color", (float)SCR_WIDTH / 4.0f + ui(80.0f), (float)SCR_HEIGHT * 3.0f / 4.0f - ui(50.0f), 0.4f * contentScale, glm::vec3(0.8f, 0.8f, 0.8f) * extraColors[9]);
-            if(isMetallic){
-                RenderText(textProgram, textVAO, textVBO, "Metalness", (float)SCR_WIDTH / 4.0f + ui(80.0f), (float)SCR_HEIGHT * 3.0f / 4.0f - ui(110.0f), 0.4f * contentScale, glm::vec3(0.8f, 0.8f, 0.8f) * extraColors[10]);
-                RenderText(textProgram, textVAO, textVBO, "Roughness", (float)SCR_WIDTH / 4.0f + ui(80.0f), (float)SCR_HEIGHT * 3.0f / 4.0f - ui(230.0f), 0.4f * contentScale, glm::vec3(0.8f, 0.8f, 0.8f) * extraColors[12]);
+        if (app.showMaterialUI){
+            drawSprite(spriteProgram, materialPanelModel, glm::vec3(1.0f, 1.0f, 1.0f), uiBackground);
+            for (const auto& btn : materialButtons) {
+                if (!btn.visible) continue;
+                glm::mat4 model = glm::mat4(1.0f);
+                if (btn.flipY) {
+                    model = glm::translate(model, glm::vec3(btn.x, btn.y + btn.h, 0.0f));
+                    model = glm::scale(model, glm::vec3(btn.w, -btn.h, 1.0f));
+                } else {
+                    model = glm::translate(model, glm::vec3(btn.x, btn.y, 0.0f));
+                    model = glm::scale(model, glm::vec3(btn.w, btn.h, 1.0f));
+                }
+                drawSprite(spriteProgram, model, app.extraColors[btn.id], btn.texture);
+            }
+            float tpl = materialPanelBounds.x;
+            float tpt = materialPanelBounds.y;
+            float tpb = tpt + materialPanelBounds.h;
+            float tpcx = tpl + materialPanelBounds.w / 2.0f;
+            float tsh = (float)app.scrHeight;
+            float tx = tpl + app.ui(80.0f);
+            RenderText(textProgram, textVAO, textVBO, "Base Color", tx, tsh - (tpt + app.ui(70.0f)), 0.4f * app.contentScale, glm::vec3(0.8f, 0.8f, 0.8f) * app.extraColors[UI_TEX_ALBEDO]);
+            if (app.isMetallic){
+                RenderText(textProgram, textVAO, textVBO, "Metalness", tx, tsh - (tpt + app.ui(130.0f)), 0.4f * app.contentScale, glm::vec3(0.8f, 0.8f, 0.8f) * app.extraColors[UI_TEX_METALLIC]);
+                RenderText(textProgram, textVAO, textVBO, "Roughness", tx, tsh - (tpt + app.ui(250.0f)), 0.4f * app.contentScale, glm::vec3(0.8f, 0.8f, 0.8f) * app.extraColors[UI_TEX_ROUGHNESS]);
             }
             else{
-                RenderText(textProgram, textVAO, textVBO, "Specular", (float)SCR_WIDTH / 4.0f + ui(80.0f), (float)SCR_HEIGHT * 3.0f / 4.0f - ui(110.0f), 0.4f * contentScale, glm::vec3(0.8f, 0.8f, 0.8f) * extraColors[10]);
-                RenderText(textProgram, textVAO, textVBO, "Glossiness", (float)SCR_WIDTH / 4.0f + ui(80.0f), (float)SCR_HEIGHT * 3.0f / 4.0f - ui(230.0f), 0.4f * contentScale, glm::vec3(0.8f, 0.8f, 0.8f) * extraColors[12]);
+                RenderText(textProgram, textVAO, textVBO, "Specular", tx, tsh - (tpt + app.ui(130.0f)), 0.4f * app.contentScale, glm::vec3(0.8f, 0.8f, 0.8f) * app.extraColors[UI_TEX_METALLIC]);
+                RenderText(textProgram, textVAO, textVBO, "Glossiness", tx, tsh - (tpt + app.ui(250.0f)), 0.4f * app.contentScale, glm::vec3(0.8f, 0.8f, 0.8f) * app.extraColors[UI_TEX_ROUGHNESS]);
             }
-            RenderText(textProgram, textVAO, textVBO, "Normal Map", (float)SCR_WIDTH / 4.0f + ui(80.0f), (float)SCR_HEIGHT * 3.0f / 4.0f - ui(170.0f), 0.4f * contentScale, glm::vec3(0.8f, 0.8f, 0.8f) * extraColors[11]);
-            RenderText(textProgram, textVAO, textVBO, "Ambient Occlusion", (float)SCR_WIDTH / 4.0f + ui(80.0f), (float)SCR_HEIGHT * 3.0f / 4.0f - ui(290.0f), 0.4f * contentScale, glm::vec3(0.8f, 0.8f, 0.8f) * extraColors[13]);
-            RenderText(textProgram, textVAO, textVBO, "Metallic", (float)SCR_WIDTH * 2.25f / 4.0f - ui(25.0f), (float)SCR_HEIGHT * 0.5f / 4.0f + ui(45.0f), 0.3f * contentScale, glm::vec3(0.8f, 0.8f, 0.8f) * extraColors[19]);
-            RenderText(textProgram, textVAO, textVBO, "Specular", (float)SCR_WIDTH * 2.25f / 4.0f + ui(75.0f), (float)SCR_HEIGHT * 0.5f / 4.0f + ui(45.0f), 0.3f * contentScale, glm::vec3(0.8f, 0.8f, 0.8f) * extraColors[20]);
+            RenderText(textProgram, textVAO, textVBO, "Normal Map", tx, tsh - (tpt + app.ui(190.0f)), 0.4f * app.contentScale, glm::vec3(0.8f, 0.8f, 0.8f) * app.extraColors[UI_TEX_NORMAL]);
+            RenderText(textProgram, textVAO, textVBO, "Ambient Occlusion", tx, tsh - (tpt + app.ui(310.0f)), 0.4f * app.contentScale, glm::vec3(0.8f, 0.8f, 0.8f) * app.extraColors[UI_TEX_AO]);
+            RenderText(textProgram, textVAO, textVBO, "Metallic", tpcx - app.ui(25.0f), tsh - (tpb - app.ui(30.0f)), 0.3f * app.contentScale, glm::vec3(0.8f, 0.8f, 0.8f) * app.extraColors[UI_WORKFLOW_METALLIC]);
+            RenderText(textProgram, textVAO, textVBO, "Specular", tpcx + app.ui(75.0f), tsh - (tpb - app.ui(30.0f)), 0.3f * app.contentScale, glm::vec3(0.8f, 0.8f, 0.8f) * app.extraColors[UI_WORKFLOW_SPECULAR]);
             glUseProgram(spriteProgram);
             glBindVertexArray(spriteVAO);
             glUniformMatrix4fv(glGetUniformLocation(spriteProgram, "projection"), 1, GL_FALSE, &orthoProj[0][0]);
             glActiveTexture(GL_TEXTURE0);
-            spriteModel = glm::mat4(1.0f);
-            spriteModel = glm::translate(spriteModel, glm::vec3((float)SCR_WIDTH * 3.0f / 4.0f - ui(30.0f), (float)SCR_HEIGHT / 4.0f + ui(20.0f), 0.0f));
-            spriteModel = glm::scale(spriteModel, glm::vec3(ui(20.0f), ui(20.0f), 1.0f));
-            glUniformMatrix4fv(glGetUniformLocation(spriteProgram, "model"), 1, GL_FALSE, &spriteModel[0][0]);
-            glUniform3fv(glGetUniformLocation(spriteProgram, "extraColor"), 1, &extraColors[8][0]);
-            glBindTexture(GL_TEXTURE_2D, uiElements[8]);
-            glDrawArrays(GL_TRIANGLES, 0, 6);
-            spriteModel = glm::scale(spriteModel, glm::vec3(2.5f, -2.5f, 1.0f));
-            spriteModel = glm::translate(spriteModel, glm::vec3(-0.6f, -1.5f, 0.0f));
-            glUniformMatrix4fv(glGetUniformLocation(spriteProgram, "model"), 1, GL_FALSE, &spriteModel[0][0]);
-            glUniform3fv(glGetUniformLocation(spriteProgram, "extraColor"), 1, &extraColors[14][0]);
-            glBindTexture(GL_TEXTURE_2D, uiElements[14]);
-            glDrawArrays(GL_TRIANGLES, 0, 6);
-            spriteModel = glm::translate(spriteModel, glm::vec3(0.0f, -1.1f, 0.0f));
-            glUniformMatrix4fv(glGetUniformLocation(spriteProgram, "model"), 1, GL_FALSE, &spriteModel[0][0]);
-            glUniform3fv(glGetUniformLocation(spriteProgram, "extraColor"), 1, &extraColors[15][0]);
-            glBindTexture(GL_TEXTURE_2D, uiElements[15]);
-            glDrawArrays(GL_TRIANGLES, 0, 6);
-            spriteModel = glm::translate(spriteModel, glm::vec3(0.0f, -1.1f, 0.0f));
-            glUniformMatrix4fv(glGetUniformLocation(spriteProgram, "model"), 1, GL_FALSE, &spriteModel[0][0]);
-            glUniform3fv(glGetUniformLocation(spriteProgram, "extraColor"), 1, &extraColors[16][0]);
-            glBindTexture(GL_TEXTURE_2D, uiElements[16]);
-            glDrawArrays(GL_TRIANGLES, 0, 6);
-            spriteModel = glm::translate(spriteModel, glm::vec3(0.0f, -1.1f, 0.0f));
-            glUniformMatrix4fv(glGetUniformLocation(spriteProgram, "model"), 1, GL_FALSE, &spriteModel[0][0]);
-            glUniform3fv(glGetUniformLocation(spriteProgram, "extraColor"), 1, &extraColors[18][0]);
-            glBindTexture(GL_TEXTURE_2D, uiElements[18]);
-            glDrawArrays(GL_TRIANGLES, 0, 6);
-            spriteModel = glm::mat4(1.0f);
-            spriteModel = glm::translate(spriteModel, glm::vec3((float)SCR_WIDTH * 2.25f / 4.0f - ui(50.0f), (float)SCR_HEIGHT * 3.5f / 4.0f - ui(30.0f), 0.0f));
-            spriteModel = glm::scale(spriteModel, glm::vec3(ui(100.0f), ui(-40.0f), 1.0f));
-            glUniformMatrix4fv(glGetUniformLocation(spriteProgram, "model"), 1, GL_FALSE, &spriteModel[0][0]);
-            glUniform3fv(glGetUniformLocation(spriteProgram, "extraColor"), 1, &extraColors[19][0]);
-            if(isMetallic) glBindTexture(GL_TEXTURE_2D, uiElements[20]);
-            else glBindTexture(GL_TEXTURE_2D, uiElements[19]);
-            glDrawArrays(GL_TRIANGLES, 0, 6);
-            spriteModel = glm::translate(spriteModel, glm::vec3(1.0f, 0.0f, 0.0f));
-            glUniformMatrix4fv(glGetUniformLocation(spriteProgram, "model"), 1, GL_FALSE, &spriteModel[0][0]);
-            glUniform3fv(glGetUniformLocation(spriteProgram, "extraColor"), 1, &extraColors[20][0]);
-            if(!isMetallic) glBindTexture(GL_TEXTURE_2D, uiElements[20]);
-            else glBindTexture(GL_TEXTURE_2D, uiElements[19]);
-            glDrawArrays(GL_TRIANGLES, 0, 6);
-            spriteModel = glm::mat4(1.0f);
-            spriteModel = glm::translate(spriteModel, glm::vec3((float)SCR_WIDTH * 0.085f, (float)SCR_HEIGHT * 0.95f, 0.0f));
-            spriteModel = glm::scale(spriteModel, glm::vec3((float)SCR_WIDTH / 1.2f, -(float)SCR_HEIGHT / 1.2f, 1.0f));
-            glUniformMatrix4fv(glGetUniformLocation(spriteProgram, "model"), 1, GL_FALSE, &spriteModel[0][0]);
-            glUniform3fv(glGetUniformLocation(spriteProgram, "extraColor"), 1, &glm::vec3(1.0f, 1.0f, 1.0f)[0]);
-            glBindTexture(GL_TEXTURE_2D, uiBackground);
-            glDrawArrays(GL_TRIANGLES, 0, 6);
+        }
+
+        if (app.tooltip != "" && tooltipTime >= 0.5f){
+            glUseProgram(spriteProgram);
+            glm::mat4 spriteModel = glm::mat4(1.0f);
+            spriteModel = glm::translate(spriteModel, glm::vec3(app.lastX - app.ui(2.5f), (float)app.scrHeight - app.lastY - app.ui(2.5f), 0.0f));
+            spriteModel = glm::scale(spriteModel, glm::vec3(app.ui(8.5f) * app.tooltip.size(), app.ui(20.0f), 1.0f));
+            glm::mat4 textProj = glm::ortho(0.0f, (float)app.scrWidth, 0.0f, (float)app.scrHeight);
+            glUniformMatrix4fv(glGetUniformLocation(spriteProgram, "projection"), 1, GL_FALSE, &textProj[0][0]);
+            glActiveTexture(GL_TEXTURE0);
+            glBindVertexArray(spriteVAO);
+            drawSprite(spriteProgram, spriteModel, glm::vec3(0.5f, 0.5f, 0.5f), 0);
+            RenderText(textProgram, textVAO, textVBO, app.tooltip, app.lastX, (float)app.scrHeight - app.lastY, 0.35f * app.contentScale, glm::vec3(0.8f, 0.8f, 0.8f));
         }
 
         glBindVertexArray(0);
 
 
         glfwSwapBuffers(window);
-        glfwPollEvents();    
+        glfwPollEvents();
     }
 
     glDeleteVertexArrays(1, &cubeVAO);
@@ -1901,192 +1699,154 @@ int main(int argc, char* argv[]) {
 }
 void framebuffer_size_callback(GLFWwindow* window, int width, int height){
     glViewport(0, 0, width, height);
-    SCR_WIDTH = width;
-    SCR_HEIGHT = height;
+    app.scrWidth = width;
+    app.scrHeight = height;
 }
 void uploadHDRI(){
     char* newEnvironment = OpenFileDialog();
-    if(newEnvironment) {
-        uploadedEnv = newEnvironment;
-        uploadingEnv = true;
+    if (newEnvironment) {
+        app.uploadedEnv = newEnvironment;
+        app.uploadingEnv = true;
     }
 }
 void uploadTexture(int tex){
     const char* newTexture = OpenFileDialogTex();
-    if(!newTexture) return;
-    if(tex==0) albedo = loadTexture(newTexture);
-    else if(tex==1) metallic = loadTexture(newTexture);
-    else if(tex==2) normal = loadTexture(newTexture);
-    else if(tex==3) roughness = loadTexture(newTexture);
-    else if(tex==4) ao = loadTexture(newTexture);
+    if (!newTexture) return;
+    if (tex==0) mat.albedo = loadTexture(newTexture);
+    else if (tex==1) mat.metallic = loadTexture(newTexture);
+    else if (tex==2) mat.normal = loadTexture(newTexture);
+    else if (tex==3) mat.roughness = loadTexture(newTexture);
+    else if (tex==4) mat.ao = loadTexture(newTexture);
 }
 void uploadZip(){
     char* newZip = OpenFileDialogZip();
-    if(newZip){
-        std::pair<unsigned int*, bool> import = OpenZipFile(newZip);
-        unsigned int* textures = import.first;
-        isMetallic = import.second;
-        if(textures[0] != -1)
-            albedo = textures[0];
-        else albedo = loadTexture(albedoLoc);
-        if(textures[1] != -1)
-            metallic = textures[1];
-        else metallic = loadTexture(metallicLoc);
-        if(textures[2] != -1)
-            normal = textures[2];
-        else normal = loadTexture(normalLoc);
-        if(textures[3] != -1)
-            roughness = textures[3];
-        else roughness = loadTexture(roughnessLoc);
-        if(textures[4] != -1)
-            ao = textures[4];
-        else ao = loadTexture(aoLoc);
+    if (newZip){
+        std::pair<std::array<unsigned int, 5>, bool> import = OpenZipFile(newZip);
+        std::array<unsigned int, 5>& textures = import.first;
+        app.isMetallic = import.second;
+        if (textures[0] != -1)
+            mat.albedo = textures[0];
+        else mat.albedo = loadTexture(albedoLoc);
+        if (textures[1] != -1)
+            mat.metallic = textures[1];
+        else mat.metallic = loadTexture(metallicLoc);
+        if (textures[2] != -1)
+            mat.normal = textures[2];
+        else mat.normal = loadTexture(normalLoc);
+        if (textures[3] != -1)
+            mat.roughness = textures[3];
+        else mat.roughness = loadTexture(roughnessLoc);
+        if (textures[4] != -1)
+            mat.ao = textures[4];
+        else mat.ao = loadTexture(aoLoc);
     }
 }
 void saveToFile(){
     char* matPath = SaveMatFileDialog();
-    if(matPath) writeCustomTextureFile(matPath, albedo, roughness, normal, metallic, ao);
+    if (matPath) writeCustomTextureFile(matPath, mat.albedo, mat.roughness, mat.normal, mat.metallic, mat.ao);
 }
 void uploadMat(){
     char* matPath = OpenFileDialogMaterial();
-    if(matPath) readCustomTextureFile(matPath, albedo, roughness, normal, metallic, ao);
+    if (matPath) readCustomTextureFile(matPath, mat.albedo, mat.roughness, mat.normal, mat.metallic, mat.ao);
 }
 void downloadTextures(){
     char* zipPath = SaveZipFileDialog();
-    if(zipPath){
-        saveTexturesToZip(zipPath, albedo, roughness, normal, metallic, ao);
+    if (zipPath){
+        saveTexturesToZip(zipPath, mat.albedo, mat.roughness, mat.normal, mat.metallic, mat.ao);
     }
 }
 void processInput(GLFWwindow *window){
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);
-    else if(glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS && highlightingUI){
-        if(currentElement < 4)
-            selectingEnv = true;
-        else if(currentElement < 6 || currentElement == 17)
-            selectingShape = true;
-        else if(currentElement == 6)
-            uploadHDRI();
-        else if(currentElement == 7)
-            showMaterialUI = true;
-        else if(currentElement == 8)
-            showMaterialUI = false;
-        else if(currentElement < 14)
-            uploadTexture(currentElement - 9);
-        else if(currentElement == 14)
-            uploadZip();
-        else if(currentElement == 15)
-            saveToFile();
-        else if(currentElement == 16)
-            uploadMat();
-        else if(currentElement == 18)
-            downloadTextures();
-        else if(currentElement == 19)
-            isMetallic = true;
-        else if(currentElement == 20)
-            isMetallic = false;
+    else if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS && app.highlightingUI){
+        if (app.currentElement >= 0 && app.currentElement < (int)environmentLocs.size()) {
+            app.selectingEnv = true;
+        }
+        else switch (static_cast<UIElement>(app.currentElement)) {
+            case UI_SHAPE_CUBE: case UI_SHAPE_SPHERE: case UI_SHAPE_TEAPOT:
+                app.selectingShape = true; break;
+            case UI_UPLOAD_HDRI: uploadHDRI(); break;
+            case UI_OPEN_MATERIAL_PANEL: app.showMaterialUI = true; break;
+            case UI_CLOSE_MATERIAL_PANEL: app.showMaterialUI = false; break;
+            case UI_TEX_ALBEDO: case UI_TEX_METALLIC: case UI_TEX_NORMAL:
+            case UI_TEX_ROUGHNESS: case UI_TEX_AO:
+                uploadTexture(app.currentElement - UI_TEX_ALBEDO); break;
+            case UI_UPLOAD_ZIP: uploadZip(); break;
+            case UI_SAVE_MAT: saveToFile(); break;
+            case UI_UPLOAD_MAT: uploadMat(); break;
+            case UI_DOWNLOAD_TEXTURES: downloadTextures(); break;
+            case UI_WORKFLOW_METALLIC: app.isMetallic = true; break;
+            case UI_WORKFLOW_SPECULAR: app.isMetallic = false; break;
+            default: break;
+        }
     }
 }
 void hoverElement(int elementNum){
-    for(unsigned int i=0; i<sizeof(extraColors)/12; i++){
-        extraColors[i] = glm::vec3(1.0f);
+    for (unsigned int i = 0; i < UI_ELEMENT_COUNT; ++i){
+        app.extraColors[i] = glm::vec3(1.0f);
     }
-    if(elementNum != -1){
-        extraColors[elementNum] = glm::vec3(1.3f, 1.3f, 1.6f);
-        currentElement = elementNum;
+    if (elementNum != -1){
+        app.extraColors[elementNum] = glm::vec3(1.3f, 1.3f, 1.6f);
+        app.currentElement = elementNum;
     }
-    else tooltip = "";
+    else app.tooltip = "";
     return;
 }
 void mouseCallback(GLFWwindow* window, double xposIn, double yposIn){
-    double xpos = xposIn * contentScale;
-    double ypos = yposIn * contentScale;
-    if(glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_RELEASE) {
-        lastX = xpos;
-        lastY = ypos;
-        firstMouse = true;
-        if(showMaterialUI){
-            if(ypos > SCR_HEIGHT / 4.0f + ui(20.0f) && ypos < SCR_HEIGHT / 4.0f + ui(40.0f) && xpos > SCR_WIDTH * 3.0f / 4.0f - ui(30.0f) && xpos < SCR_WIDTH * 3.0f / 4.0f - ui(10.0f)){
-                hoverElement(8); highlightingUI = true;
-            }
-            else if(ypos > SCR_HEIGHT * 29.0f / 36.0f || ypos < SCR_HEIGHT / 4.0f || xpos < SCR_WIDTH / 4.0f || xpos > SCR_WIDTH * 3.0f / 4.0f){
-                hoverElement(-1); currentElement = 8; highlightingUI = true;
-            }
-            else if(ypos < SCR_HEIGHT / 4.0f + ui(95.0f) && ypos > SCR_HEIGHT / 4.0f + ui(45.0f) && xpos > SCR_WIDTH * 3.0f / 4.0f - ui(60.0f) && xpos < SCR_WIDTH * 3.0f / 4.0f - ui(10.0f)){
-                hoverElement(14); highlightingUI = true; tooltip = "Upload .zip";
-            }
-            else if(ypos < SCR_HEIGHT / 4.0f + ui(150.0f) && ypos > SCR_HEIGHT / 4.0f + ui(100.0f) && xpos > SCR_WIDTH * 3.0f / 4.0f - ui(60.0f) && xpos < SCR_WIDTH * 3.0f / 4.0f - ui(10.0f)){
-                hoverElement(15); highlightingUI = true; tooltip = "Save .mat";
-            }
-            else if(ypos < SCR_HEIGHT / 4.0f + ui(205.0f) && ypos > SCR_HEIGHT / 4.0f + ui(155.0f) && xpos > SCR_WIDTH * 3.0f / 4.0f - ui(60.0f) && xpos < SCR_WIDTH * 3.0f / 4.0f - ui(10.0f)){
-                hoverElement(16); highlightingUI = true; tooltip = "Upload .mat";
-            }
-            else if(ypos < SCR_HEIGHT / 4.0f + ui(260.0f) && ypos > SCR_HEIGHT / 4.0f + ui(210.0f) && xpos > SCR_WIDTH * 3.0f / 4.0f - ui(60.0f) && xpos < SCR_WIDTH * 3.0f / 4.0f - ui(10.0f)){
-                hoverElement(18); highlightingUI = true; tooltip = "Download textures";
-            }
-            else if(ypos > SCR_HEIGHT * 3.5f / 4.0f - ui(75.0f) && ypos < SCR_HEIGHT * 3.5 / 4.0f - ui(25.0f) && xpos > SCR_WIDTH * 2.25f / 4.0f - ui(50.0f) && xpos < SCR_WIDTH * 2.25f / 4.0f + ui(50.0f)){
-                hoverElement(19); highlightingUI = true; tooltip = "Use metallic workflow";
-            }
-            else if(ypos > SCR_HEIGHT * 3.5f / 4.0f - ui(75.0f) && ypos < SCR_HEIGHT * 3.5 / 4.0f - ui(25.0f) && xpos > SCR_WIDTH * 2.25f / 4.0f + ui(50.0f) && xpos < SCR_WIDTH * 2.25f / 4.0f + ui(150.0f)){
-                hoverElement(20); highlightingUI = true; tooltip = "Use specular workflow";
-            }
-            else if(xpos > SCR_WIDTH / 4.0f + ui(20.0f) && xpos < SCR_WIDTH / 4.0f + ui(70.0f)){
-                if(ypos > SCR_HEIGHT / 4.0f + ui(20.0f) && ypos < SCR_HEIGHT / 4.0f + ui(70.0f)) {
-                    hoverElement(9); highlightingUI = true;
+    double xpos = xposIn * app.contentScale;
+    double ypos = yposIn * app.contentScale;
+    if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_RELEASE) {
+        app.lastX = xpos;
+        app.lastY = ypos;
+        app.firstMouse = true;
+        app.highlightingUI = false;
+        if (app.showMaterialUI){
+            if (!materialPanelBounds.contains(xpos, ypos)){
+                hoverElement(-1);
+                app.currentElement = UI_CLOSE_MATERIAL_PANEL;
+                app.highlightingUI = true;
+            } else {
+                for (const auto& btn : materialButtons) {
+                    if (btn.contains(xpos, ypos)) {
+                        hoverElement(btn.id);
+                        app.highlightingUI = true;
+                        if (!btn.tooltip.empty()) app.tooltip = btn.tooltip;
+                        break;
+                    }
                 }
-                else if(ypos > SCR_HEIGHT / 4.0f + ui(80.0f) && ypos < SCR_HEIGHT / 4.0f + ui(130.0f)) {
-                    hoverElement(10); highlightingUI = true;
-                }
-                else if(ypos > SCR_HEIGHT / 4.0f + ui(140.0f) && ypos < SCR_HEIGHT / 4.0f + ui(190.0f)) {
-                    hoverElement(11); highlightingUI = true;
-                }
-                else if(ypos > SCR_HEIGHT / 4.0f + ui(200.0f) && ypos < SCR_HEIGHT / 4.0f + ui(250.0f)) {
-                    hoverElement(12); highlightingUI = true;
-                }
-                else if(ypos > SCR_HEIGHT / 4.0f + ui(260.0f) && ypos < SCR_HEIGHT / 4.0f + ui(310.0f)) {
-                    hoverElement(13); highlightingUI = true;
-                }
-                else if(highlightingUI) {hoverElement(-1); highlightingUI = false;}
             }
-            else if(highlightingUI) {hoverElement(-1); highlightingUI = false;}
+        } else {
+            for (const auto& btn : buttons) {
+                if (btn.contains(xpos, ypos)) {
+                    hoverElement(btn.id);
+                    app.highlightingUI = true;
+                    if (!btn.tooltip.empty()) app.tooltip = btn.tooltip;
+                    break;
+                }
+            }
         }
-        else if(ypos > SCR_HEIGHT - ui(60.0f) && ypos < SCR_HEIGHT - ui(10.0f)){
-            if(xpos > ui(10.0f) && xpos < ui(60.0f)) {hoverElement(0); highlightingUI = true;}
-            else if(xpos > ui(60.0f) && xpos < ui(110.0f)) {hoverElement(1); highlightingUI = true;}
-            else if(xpos > ui(110.0f) && xpos < ui(160.0f)) {hoverElement(2); highlightingUI = true;}
-            else if(xpos > ui(160.0f) && xpos < ui(210.0f)) {hoverElement(3); highlightingUI = true;}
-            else if(xpos > ui(210.0f) && xpos < ui(260.0f)) {hoverElement(6); highlightingUI = true; tooltip = "Upload HDRI environment";}
-            else if(xpos > SCR_WIDTH - ui(60.0f) && xpos < SCR_WIDTH - ui(10.0f)) {hoverElement(4); highlightingUI = true;}
-            else if(xpos > SCR_WIDTH - ui(110.0f) && xpos < SCR_WIDTH - ui(60.0f)) {hoverElement(5); highlightingUI = true;}
-            else if(xpos > SCR_WIDTH - ui(160.0f) && xpos < SCR_WIDTH - ui(110.0f)) {hoverElement(17); highlightingUI = true;}
-            else if(xpos > SCR_WIDTH - ui(210.0f) && xpos < SCR_WIDTH - ui(160.0f)) {hoverElement(7); highlightingUI = true; tooltip = "Change material";}
-            else if(highlightingUI) {hoverElement(-1); highlightingUI = false;}
-        }
-        else if(highlightingUI) {hoverElement(-1); highlightingUI = false;}
+        if (!app.highlightingUI) hoverElement(-1);
         return;
     }
     float xposf = static_cast<float>(xpos);
     float yposf = static_cast<float>(ypos);
-    if (firstMouse){
-        lastX = xposf;
-        lastY = yposf;
-        firstMouse = false;
+    if (app.firstMouse){
+        app.lastX = xposf;
+        app.lastY = yposf;
+        app.firstMouse = false;
     }
-    float xOffset = xposf - lastX;
-    float yOffset = lastY - yposf;
-    lastX = xposf;
-    lastY = yposf;
+    float xOffset = xposf - app.lastX;
+    float yOffset = app.lastY - yposf;
+    app.lastX = xposf;
+    app.lastY = yposf;
     float sensitivity = 0.007f;
     xOffset *= sensitivity;
     yOffset *= sensitivity;
-    yaw += xOffset;
-    pitch += yOffset;
-    if(pitch > 1.57)
-        pitch =  1.57f;
-    else if(pitch < -1.57f)
-        pitch = -1.57f;
-    float camX = sin(yaw) * radius;
-    float camY = sin(pitch) * radius;
-    float camZ = cos(yaw) * radius;
-    camPos = glm::vec3(camX, camY, camZ);
+    cam.yaw += xOffset;
+    cam.pitch += yOffset;
+    cam.pitch = std::clamp(cam.pitch, -1.57f, 1.57f);
+    float camX = sin(cam.yaw) * cam.radius;
+    float camY = sin(cam.pitch) * cam.radius;
+    float camZ = cos(cam.yaw) * cam.radius;
+    cam.pos = glm::vec3(camX, camY, camZ);
 }
