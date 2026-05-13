@@ -1300,11 +1300,11 @@ void layoutButtons(const unsigned int* uiElements) {
 
         materialButtons = {
             {UI_CLOSE_MATERIAL_PANEL, "", pr - app.ui(30.0f), pt + app.ui(40.0f), app.ui(20.0f), app.ui(20.0f), uiElements[UI_CLOSE_MATERIAL_PANEL], true, false},
-            {UI_TEX_ALBEDO, "", pl + app.ui(20.0f), pt + app.ui(40.0f), app.ui(50.0f), app.ui(50.0f), mat.albedo, true, false},
-            {UI_TEX_METALLIC, "", pl + app.ui(20.0f), pt + app.ui(100.0f), app.ui(50.0f), app.ui(50.0f), mat.metallic, true, false},
-            {UI_TEX_NORMAL, "", pl + app.ui(20.0f), pt + app.ui(160.0f), app.ui(50.0f), app.ui(50.0f), mat.normal, true, false},
-            {UI_TEX_ROUGHNESS, "", pl + app.ui(20.0f), pt + app.ui(220.0f), app.ui(50.0f), app.ui(50.0f), mat.roughness, true, false},
-            {UI_TEX_AO, "", pl + app.ui(20.0f), pt + app.ui(280.0f), app.ui(50.0f), app.ui(50.0f), mat.ao, true, false},
+            {UI_TEX_ALBEDO, "", pl + app.ui(20.0f), pt + app.ui(40.0f), app.ui(40.0f), app.ui(40.0f), mat.albedo, true, false},
+            {UI_TEX_METALLIC, "", pl + app.ui(20.0f), pt + app.ui(90.0f), app.ui(40.0f), app.ui(40.0f), mat.metallic, true, false},
+            {UI_TEX_NORMAL, "", pl + app.ui(20.0f), pt + app.ui(140.0f), app.ui(40.0f), app.ui(40.0f), mat.normal, true, false},
+            {UI_TEX_ROUGHNESS, "", pl + app.ui(20.0f), pt + app.ui(190.0f), app.ui(40.0f), app.ui(40.0f), mat.roughness, true, false},
+            {UI_TEX_AO, "", pl + app.ui(20.0f), pt + app.ui(240.0f), app.ui(40.0f), app.ui(40.0f), mat.ao, true, false},
             {UI_UPLOAD_ZIP, "Upload .zip", pr - app.ui(60.0f), pt + app.ui(65.0f), app.ui(50.0f), app.ui(50.0f), uiElements[UI_UPLOAD_ZIP], true, true},
             {UI_SAVE_MAT, "Save .mat", pr - app.ui(60.0f), pt + app.ui(120.0f), app.ui(50.0f), app.ui(50.0f), uiElements[UI_SAVE_MAT], true, true},
             {UI_UPLOAD_MAT, "Upload .mat", pr - app.ui(60.0f), pt + app.ui(175.0f), app.ui(50.0f), app.ui(50.0f), uiElements[UI_UPLOAD_MAT], true, true},
@@ -1639,17 +1639,17 @@ int main(int argc, char* argv[]) {
             float tpcx = tpl + materialPanelBounds.w / 2.0f;
             float tsh = (float)app.scrHeight;
             float tx = tpl + app.ui(80.0f);
-            RenderText(textProgram, textVAO, textVBO, "Base Color", tx, tsh - (tpt + app.ui(70.0f)), 0.4f * app.contentScale, glm::vec3(0.8f, 0.8f, 0.8f) * app.extraColors[UI_TEX_ALBEDO]);
+            RenderText(textProgram, textVAO, textVBO, "Base Color", tx, tsh - (tpt + app.ui(65.0f)), 0.35f * app.contentScale, glm::vec3(0.8f, 0.8f, 0.8f) * app.extraColors[UI_TEX_ALBEDO]);
             if (app.isMetallic){
-                RenderText(textProgram, textVAO, textVBO, "Metalness", tx, tsh - (tpt + app.ui(130.0f)), 0.4f * app.contentScale, glm::vec3(0.8f, 0.8f, 0.8f) * app.extraColors[UI_TEX_METALLIC]);
-                RenderText(textProgram, textVAO, textVBO, "Roughness", tx, tsh - (tpt + app.ui(250.0f)), 0.4f * app.contentScale, glm::vec3(0.8f, 0.8f, 0.8f) * app.extraColors[UI_TEX_ROUGHNESS]);
+                RenderText(textProgram, textVAO, textVBO, "Metalness", tx, tsh - (tpt + app.ui(115.0f)), 0.35f * app.contentScale, glm::vec3(0.8f, 0.8f, 0.8f) * app.extraColors[UI_TEX_METALLIC]);
+                RenderText(textProgram, textVAO, textVBO, "Roughness", tx, tsh - (tpt + app.ui(215.0f)), 0.35f * app.contentScale, glm::vec3(0.8f, 0.8f, 0.8f) * app.extraColors[UI_TEX_ROUGHNESS]);
             }
             else{
-                RenderText(textProgram, textVAO, textVBO, "Specular", tx, tsh - (tpt + app.ui(130.0f)), 0.4f * app.contentScale, glm::vec3(0.8f, 0.8f, 0.8f) * app.extraColors[UI_TEX_METALLIC]);
-                RenderText(textProgram, textVAO, textVBO, "Glossiness", tx, tsh - (tpt + app.ui(250.0f)), 0.4f * app.contentScale, glm::vec3(0.8f, 0.8f, 0.8f) * app.extraColors[UI_TEX_ROUGHNESS]);
+                RenderText(textProgram, textVAO, textVBO, "Specular", tx, tsh - (tpt + app.ui(115.0f)), 0.35f * app.contentScale, glm::vec3(0.8f, 0.8f, 0.8f) * app.extraColors[UI_TEX_METALLIC]);
+                RenderText(textProgram, textVAO, textVBO, "Glossiness", tx, tsh - (tpt + app.ui(215.0f)), 0.35f * app.contentScale, glm::vec3(0.8f, 0.8f, 0.8f) * app.extraColors[UI_TEX_ROUGHNESS]);
             }
-            RenderText(textProgram, textVAO, textVBO, "Normal Map", tx, tsh - (tpt + app.ui(190.0f)), 0.4f * app.contentScale, glm::vec3(0.8f, 0.8f, 0.8f) * app.extraColors[UI_TEX_NORMAL]);
-            RenderText(textProgram, textVAO, textVBO, "Ambient Occlusion", tx, tsh - (tpt + app.ui(310.0f)), 0.4f * app.contentScale, glm::vec3(0.8f, 0.8f, 0.8f) * app.extraColors[UI_TEX_AO]);
+            RenderText(textProgram, textVAO, textVBO, "Normal Map", tx, tsh - (tpt + app.ui(165.0f)), 0.35f * app.contentScale, glm::vec3(0.8f, 0.8f, 0.8f) * app.extraColors[UI_TEX_NORMAL]);
+            RenderText(textProgram, textVAO, textVBO, "Ambient Occlusion", tx, tsh - (tpt + app.ui(265.0f)), 0.35f * app.contentScale, glm::vec3(0.8f, 0.8f, 0.8f) * app.extraColors[UI_TEX_AO]);
             RenderText(textProgram, textVAO, textVBO, "Metallic", tpcx - app.ui(25.0f), tsh - (tpb - app.ui(30.0f)), 0.3f * app.contentScale, glm::vec3(0.8f, 0.8f, 0.8f) * app.extraColors[UI_WORKFLOW_METALLIC]);
             RenderText(textProgram, textVAO, textVBO, "Specular", tpcx + app.ui(75.0f), tsh - (tpb - app.ui(30.0f)), 0.3f * app.contentScale, glm::vec3(0.8f, 0.8f, 0.8f) * app.extraColors[UI_WORKFLOW_SPECULAR]);
             glUseProgram(spriteProgram);
